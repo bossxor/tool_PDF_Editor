@@ -1,0 +1,8 @@
+node_modules/
+out/
+dist/
+*.tmp
+.DS_Store
+
+# Packaged app binaries (too large for git, rebuild with `npm run dist`)
+*.exe

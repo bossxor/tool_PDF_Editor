@@ -1,0 +1,58 @@
+{
+  "name": "pdf-editor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PDF viewer & editor",
+  "license": "AGPL-3.0-or-later",
+  "main": "out/main/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "icon": "node scripts/gen-icon.mjs",
+    "dist": "electron-vite build && electron-builder --win"
+  },
+  "build": {
+    "appId": "local.pdfeditor",
+    "productName": "PDF Editor",
+    "files": [
+      "out/**/*"
+    ],
+    "fileAssociations": [
+      {
+        "ext": "pdf",
+        "name": "PDF Document",
+        "icon": "build/icon.ico"
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    }
+  },
+  "dependencies": {
+    "comlink": "^4.4.2",
+    "mupdf": "^1.28.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^44.4.4",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "png-to-ico": "^3.0.2",
+    "sharp": "^0.35.4",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6"
+  }
+}
