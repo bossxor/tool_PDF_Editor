@@ -201,7 +201,9 @@ export class EngineSession {
     for (const block of json.blocks ?? []) {
       if (block.type !== 'text') continue
       for (const line of block.lines ?? []) {
-        const bbox = line.bbox as [number, number, number, number]
+        // stext JSON gives bbox as {x,y,w,h}, not a [x0,y0,x1,y1] tuple.
+        const b = line.bbox as { x: number; y: number; w: number; h: number }
+        const bbox: [number, number, number, number] = [b.x, b.y, b.x + b.w, b.y + b.h]
         const text = (line.text as string) ?? ''
         const fontSize = line.font?.size ?? 10
         if (text.trim().length > 0) lines.push({ bbox, text, fontSize })
