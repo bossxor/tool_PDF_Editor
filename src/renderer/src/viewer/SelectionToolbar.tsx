@@ -35,6 +35,8 @@ export default function SelectionToolbar(): React.ReactElement | null {
   const { useDocStore, useToolStore, useAnnotStore } = useTab()
   const info = useDocStore((s) => s.info)
   const editMode = useDocStore((s) => s.editMode)
+  const zoom = useDocStore((s) => s.zoom)
+  const fitMode = useDocStore((s) => s.fitMode)
   const tool = useToolStore((s) => s.tool)
   const styles = useToolStore((s) => s.styles)
   const create = useAnnotStore((s) => s.create)
@@ -135,6 +137,15 @@ export default function SelectionToolbar(): React.ReactElement | null {
   useEffect(() => {
     setPending(null)
   }, [tool])
+
+  // Zooming rescales every page's text layer in place. A selection made
+  // (or still in progress) at the old scale no longer lines up with the new
+  // one, and applying it would mark the wrong spot — so zooming clears any
+  // in-flight selection instead of trying to carry stale coordinates over.
+  useEffect(() => {
+    setPending(null)
+    window.getSelection()?.removeAllRanges()
+  }, [zoom, fitMode])
 
   const applyMark = async (type: AnnotType): Promise<void> => {
     if (!pending) return

@@ -33,6 +33,8 @@ function rgbToCss(c: [number, number, number] | null, opacity = 1): string {
 export default function AnnotLayer({ pageIndex, width, height, scale }: Props): React.ReactElement {
   const { api, useDocStore, useToolStore, useAnnotStore } = useTab()
   const editMode = useDocStore((s) => s.editMode)
+  const zoom = useDocStore((s) => s.zoom)
+  const fitMode = useDocStore((s) => s.fitMode)
   const tool = useToolStore((s) => s.tool)
   const styles = useToolStore((s) => s.styles)
   const selectedId = useToolStore((s) => s.selectedAnnotId)
@@ -54,6 +56,14 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
   useEffect(() => {
     if (annots === undefined) void loadPage(pageIndex)
   }, [pageIndex, annots, loadPage])
+
+  // Zooming mid-draw/mid-drag would place the shape using a mix of old and
+  // new scale — safer to just drop the in-progress interaction and let the
+  // user redo it at the new zoom level.
+  useEffect(() => {
+    setDrag(null)
+    setMoving(null)
+  }, [zoom, fitMode])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
