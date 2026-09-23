@@ -49,7 +49,7 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
   const [drag, setDrag] = useState<{ start: [number, number]; cur: [number, number]; ink: [number, number][] } | null>(
     null
   )
-  const [moving, setMoving] = useState<{ id: string; start: [number, number]; orig: AnnotData } | null>(null)
+  const [moving, setMoving] = useState<{ id: string; start: [number, number]; orig: AnnotData; dx: number; dy: number } | null>(null)
   const [editing, setEditing] = useState<EditingState | null>(null)
   const editCancelledRef = useRef(false)
 
@@ -67,15 +67,19 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (editing) return
-      if (e.key === 'Delete' && selectedId) {
-        void remove(pageIndex, selectedId)
-        setSelected(null)
-      }
+      if (editing || !editMode) return
+      if (e.key !== 'Delete' || !selectedId) return
+      // Every visible page mounts its own AnnotLayer — only the page that
+      // actually owns the selected annotation may act on it.
+      if (!(annots ?? []).some((a) => a.id === selectedId)) return
+      const tag = (e.target as HTMLElement | null)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      void remove(pageIndex, selectedId)
+      setSelected(null)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, pageIndex, remove, setSelected, editing])
+  }, [selectedId, pageIndex, remove, setSelected, editing, editMode, annots])
 
   const toPdf = (clientX: number, clientY: number): [number, number] => {
     const rect = svgRef.current!.getBoundingClientRect()
@@ -100,28 +104,35 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
       const p = toPdf(e.clientX, e.clientY)
       setDrag((d) => (d ? { ...d, cur: p, ink: tool === 'Ink' ? [...d.ink, p] : d.ink } : d))
     } else if (moving) {
+      // Preview only — the move is committed once on release (see
+      // commitMove). Writing on every mousemove used to flood the engine
+      // with IPC calls and leave one undo step per pixel of movement.
       const p = toPdf(e.clientX, e.clientY)
-      const dx = p[0] - moving.start[0]
-      const dy = p[1] - moving.start[1]
-      const orig = moving.orig
-      if (orig.type === 'Ink' && orig.ink) {
-        const ink = orig.ink.map((stroke) => stroke.map(([x, y]) => [x + dx, y + dy] as [number, number]))
-        void update(pageIndex, moving.id, { ink })
-      } else if (orig.type === 'Line' && orig.line) {
-        const line: [[number, number], [number, number]] = [
-          [orig.line[0][0] + dx, orig.line[0][1] + dy],
-          [orig.line[1][0] + dx, orig.line[1][1] + dy]
-        ]
-        void update(pageIndex, moving.id, { line, rect: orig.rect })
-      } else if ((orig.type === 'Highlight' || orig.type === 'Underline' || orig.type === 'StrikeOut') && orig.quads) {
-        const quads = orig.quads.map(
-          (q) => q.map((v, i) => (i % 2 === 0 ? v + dx : v + dy)) as typeof q
-        )
-        void update(pageIndex, moving.id, { quads })
-      } else {
-        const [x0, y0, x1, y1] = orig.rect
-        void update(pageIndex, moving.id, { rect: [x0 + dx, y0 + dy, x1 + dx, y1 + dy] })
-      }
+      setMoving((m) => (m ? { ...m, dx: p[0] - m.start[0], dy: p[1] - m.start[1] } : m))
+    }
+  }
+
+  const commitMove = async (): Promise<void> => {
+    if (!moving) return
+    const { id, orig, dx, dy } = moving
+    setMoving(null)
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return // plain click, nothing moved
+    if (orig.type === 'Ink' && orig.ink) {
+      const ink = orig.ink.map((stroke) => stroke.map(([x, y]) => [x + dx, y + dy] as [number, number]))
+      await update(pageIndex, id, { ink })
+    } else if (orig.type === 'Line' && orig.line) {
+      const line: [[number, number], [number, number]] = [
+        [orig.line[0][0] + dx, orig.line[0][1] + dy],
+        [orig.line[1][0] + dx, orig.line[1][1] + dy]
+      ]
+      const [x0, y0, x1, y1] = orig.rect
+      await update(pageIndex, id, { line, rect: [x0 + dx, y0 + dy, x1 + dx, y1 + dy] })
+    } else if ((orig.type === 'Highlight' || orig.type === 'Underline' || orig.type === 'StrikeOut') && orig.quads) {
+      const quads = orig.quads.map((q) => q.map((v, i) => (i % 2 === 0 ? v + dx : v + dy)) as typeof q)
+      await update(pageIndex, id, { quads })
+    } else {
+      const [x0, y0, x1, y1] = orig.rect
+      await update(pageIndex, id, { rect: [x0 + dx, y0 + dy, x1 + dx, y1 + dy] })
     }
   }
 
@@ -218,7 +229,7 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
 
   const onPointerUp = (): void => {
     if (drag) void commitDraw()
-    if (moving) setMoving(null)
+    if (moving) void commitMove()
   }
 
   const renderShape = (a: AnnotData): React.ReactElement => {
@@ -231,7 +242,7 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
         e.stopPropagation()
         setSelected(a.id)
         ;(e.target as Element).setPointerCapture(e.pointerId)
-        setMoving({ id: a.id, start: toPdf(e.clientX, e.clientY), orig: a })
+        setMoving({ id: a.id, start: toPdf(e.clientX, e.clientY), orig: a, dx: 0, dy: 0 })
       },
       onDoubleClick: (e: React.MouseEvent) => {
         if (tool !== 'select') return
@@ -428,7 +439,15 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
-      {(annots ?? []).map(renderShape)}
+      {(annots ?? []).map((a) =>
+        moving?.id === a.id ? (
+          <g key={a.id} transform={`translate(${moving.dx * scale} ${moving.dy * scale})`}>
+            {renderShape(a)}
+          </g>
+        ) : (
+          renderShape(a)
+        )
+      )}
       {drag && tool === 'Ink' && (
         <polyline
           points={drag.ink.map(([x, y]) => `${x * scale},${y * scale}`).join(' ')}

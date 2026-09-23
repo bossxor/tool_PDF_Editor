@@ -22,6 +22,12 @@ export default function SaveOptionsDialog({
         setError('비밀번호를 입력하세요.')
         return
       }
+      if (pw.includes(',')) {
+        // MuPDF's save options are a comma-separated string; a comma here
+        // would split the password and silently break encryption.
+        setError('비밀번호에 쉼표(,)는 사용할 수 없습니다.')
+        return
+      }
       if (pw !== pw2) {
         setError('비밀번호가 일치하지 않습니다.')
         return

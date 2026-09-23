@@ -66,6 +66,9 @@ function computeFallbackRect(annot: mupdf.PDFAnnotation): [number, number, numbe
   return [0, 0, 0, 0]
 }
 
+// Annotation types the renderer draws as its own SVG overlay (AnnotLayer).
+const OVERLAY_TYPES = new Set(['Highlight', 'Underline', 'StrikeOut', 'Square', 'Circle', 'Line', 'Ink', 'FreeText', 'Text'])
+
 function getRotation(page: mupdf.PDFPage): number {
   const r = page.getObject().getInheritable('Rotate')
   const n = r?.isNumber?.() ? r.asNumber() : 0
@@ -173,9 +176,21 @@ export class EngineSession {
     return convert(outline)
   }
 
+  // The renderer draws these annotation types itself as an SVG overlay, so the
+  // on-screen bitmap must leave them out — otherwise they show up twice, and
+  // the baked-in copy goes stale (ghosts at the old spot) after a move/undo
+  // until the next re-render. hidden-for-editing is a runtime-only flag; it
+  // doesn't touch what gets saved.
+  private setOverlayAnnotsHidden(page: mupdf.PDFPage, hidden: boolean): void {
+    for (const a of page.getAnnotations()) {
+      if (OVERLAY_TYPES.has(a.getType())) a.setHiddenForEditing(hidden)
+    }
+  }
+
   renderPage(pageIndex: number, scale: number): { width: number; height: number; png: Buffer } {
     const d = this.requireDoc()
     const page = d.loadPage(pageIndex)
+    this.setOverlayAnnotsHidden(page, true)
     const matrix = mupdf.Matrix.scale(scale, scale)
     const pix = page.toPixmap(matrix, mupdf.ColorSpace.DeviceRGB, false, true)
     const png = Buffer.from(pix.asPNG())
@@ -185,6 +200,8 @@ export class EngineSession {
   loadPageForPrint(pageIndex: number, scale: number, includeAnnots: boolean): { width: number; height: number; png: Buffer } {
     const d = this.requireDoc()
     const page = d.loadPage(pageIndex)
+    // Print has no SVG overlay — annotations must be baked into the bitmap.
+    this.setOverlayAnnotsHidden(page, false)
     const matrix = mupdf.Matrix.scale(scale, scale)
     const pix = page.toPixmap(matrix, mupdf.ColorSpace.DeviceRGB, false, includeAnnots)
     return { width: pix.getWidth(), height: pix.getHeight(), png: Buffer.from(pix.asPNG()) }

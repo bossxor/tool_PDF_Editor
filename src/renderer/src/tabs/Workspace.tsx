@@ -36,23 +36,32 @@ export default function Workspace({ onOpenNewTab }: { onOpenNewTab: () => void }
   const loadInfo = useCallback(() => loadInfoInBundle(tab), [tab])
 
   const handleSave = useCallback(async () => {
-    const result = await api.save({ encryption: 'keep' })
-    if (!result.ok) {
-      setError('저장에 실패했습니다.')
-      return
+    try {
+      const result = await api.save({ encryption: 'keep' })
+      if (!result.ok) {
+        setError('저장에 실패했습니다.')
+        return
+      }
+      useAnnotStore.setState({ dirty: false })
+    } catch {
+      // e.g. the file is open/locked in another program
+      setError('저장에 실패했습니다. 다른 프로그램에서 파일을 열고 있는지 확인하세요.')
     }
-    useAnnotStore.setState({ dirty: false })
   }, [api, setError, useAnnotStore])
 
   const handleSaveAs = useCallback(
     async (encryption: 'keep' | 'none' | { userPassword: string; ownerPassword?: string }) => {
       setSaveAsOpen(false)
-      const result = await api.saveAs({ encryption })
-      if (!result.ok) return
-      useAnnotStore.setState({ dirty: false })
-      useDocStore.setState({ filePath: result.path ?? null })
+      try {
+        const result = await api.saveAs({ encryption })
+        if (!result.ok) return
+        useAnnotStore.setState({ dirty: false })
+        useDocStore.setState({ filePath: result.path ?? null })
+      } catch {
+        setError('저장에 실패했습니다. 다른 프로그램에서 파일을 열고 있는지 확인하세요.')
+      }
     },
-    [api, useAnnotStore, useDocStore]
+    [api, useAnnotStore, useDocStore, setError]
   )
 
   const handlePasswordSubmit = useCallback(
@@ -89,11 +98,13 @@ export default function Workspace({ onOpenNewTab }: { onOpenNewTab: () => void }
         e.preventDefault()
         setPrintOpen(true)
       }
-      if (mod && e.key.toLowerCase() === 'z' && info) {
+      const inField = ['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement | null)?.tagName ?? '')
+      // Inside a text field, Ctrl+Z/Y must undo the typing, not the document.
+      if (mod && e.key.toLowerCase() === 'z' && info && !inField) {
         e.preventDefault()
         void undo()
       }
-      if (mod && e.key.toLowerCase() === 'y' && info) {
+      if (mod && e.key.toLowerCase() === 'y' && info && !inField) {
         e.preventDefault()
         void redo()
       }
@@ -102,8 +113,8 @@ export default function Workspace({ onOpenNewTab }: { onOpenNewTab: () => void }
         void window.api.toggleFullscreen()
       }
 
-      // Single-key tool shortcuts — only when not typing in a field.
-      if (!mod && !e.altKey && info) {
+      // Single-key tool shortcuts — edit mode only, and not while typing in a field.
+      if (!mod && !e.altKey && info && useDocStore.getState().editMode) {
         const tag = (e.target as HTMLElement | null)?.tagName
         if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
           const map: Record<string, string> = {

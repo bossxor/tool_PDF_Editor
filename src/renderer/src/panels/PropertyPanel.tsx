@@ -47,19 +47,20 @@ export default function PropertyPanel(): React.ReactElement | null {
   const styles = useToolStore((s) => s.styles)
   const setStyle = useToolStore((s) => s.setStyle)
   const selectedId = useToolStore((s) => s.selectedAnnotId)
-  const currentPage = useDocStore((s) => s.currentPage)
-  const annots = useAnnotStore((s) => s.byPage[currentPage])
+  const editMode = useDocStore((s) => s.editMode)
+  const byPage = useAnnotStore((s) => s.byPage)
   const updateAnnot = useAnnotStore((s) => s.update)
   const removeAnnot = useAnnotStore((s) => s.remove)
 
-  const selected = selectedId ? annots?.find((a) => a.id === selectedId) : null
+  // The selection can live on any visible page, not just the "current" one.
+  const selected = selectedId ? Object.values(byPage).flat().find((a) => a.id === selectedId) ?? null : null
   const target = selected?.type ?? (tool !== 'select' && tool !== 'pan' ? tool : null)
-  if (!target) return null
+  if (!editMode || !target) return null
 
   const style: AnnotStyle = selected?.style ?? styles[target] ?? { stroke: [0, 0, 0], fill: null, width: 1, opacity: 1 }
 
   const apply = (patch: Partial<AnnotStyle>): void => {
-    if (selected) void updateAnnot(currentPage, selected.id, { style: { ...style, ...patch } })
+    if (selected) void updateAnnot(selected.page, selected.id, { style: { ...style, ...patch } })
     else setStyle(target, patch)
   }
 
@@ -114,7 +115,7 @@ export default function PropertyPanel(): React.ReactElement | null {
         <button
           className="danger"
           onClick={() => {
-            void removeAnnot(currentPage, selected.id)
+            void removeAnnot(selected.page, selected.id)
           }}
         >
           삭제
