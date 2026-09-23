@@ -42,6 +42,9 @@ function createWindow(): void {
     })
   }
 
+  mainWindow.on('enter-full-screen', () => mainWindow?.webContents.send('fullscreen-changed', true))
+  mainWindow.on('leave-full-screen', () => mainWindow?.webContents.send('fullscreen-changed', false))
+
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()
     if (pendingOpenPaths.length > 0) {
@@ -158,6 +161,12 @@ function registerIpc(): void {
       await printDocument(mainWindow!, getSession(tabId), opts)
     }
   )
+
+  ipcMain.handle('window:toggleFullscreen', () => {
+    const next = !mainWindow!.isFullScreen()
+    mainWindow!.setFullScreen(next)
+    return next
+  })
 }
 
 const gotLock = app.requestSingleInstanceLock()

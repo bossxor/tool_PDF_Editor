@@ -18,9 +18,11 @@ interface Props {
   scale: number
 }
 
-// Highlight/Underline/StrikeOut are created from text selection (see
-// SelectionToolbar), not by arming a tool and dragging a box.
+// Highlight/Underline/StrikeOut are marked by dragging over real text (see
+// SelectionToolbar), not by drawing a box on this SVG layer — they're
+// handled separately from the shape/ink/text-box tools below.
 const DRAW_TYPES = new Set(['Square', 'Circle', 'Line', 'Ink', 'FreeText', 'Text'])
+export const MARK_TYPES = new Set(['Highlight', 'Underline', 'StrikeOut'])
 
 function rgbToCss(c: [number, number, number] | null, opacity = 1): string {
   if (!c) return 'none'
@@ -29,7 +31,8 @@ function rgbToCss(c: [number, number, number] | null, opacity = 1): string {
 }
 
 export default function AnnotLayer({ pageIndex, width, height, scale }: Props): React.ReactElement {
-  const { api, useToolStore, useAnnotStore } = useTab()
+  const { api, useDocStore, useToolStore, useAnnotStore } = useTab()
+  const editMode = useDocStore((s) => s.editMode)
   const tool = useToolStore((s) => s.tool)
   const styles = useToolStore((s) => s.styles)
   const selectedId = useToolStore((s) => s.selectedAnnotId)
@@ -232,7 +235,10 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
           style: a.style
         })
       },
-      style: { cursor: tool === 'select' ? 'move' : 'default', pointerEvents: 'auto' as const }
+      style: {
+        cursor: tool === 'select' ? 'move' : 'default',
+        pointerEvents: (editMode ? 'auto' : 'none') as React.CSSProperties['pointerEvents']
+      }
     }
     const [x0, y0, x1, y1] = a.rect
     const sel = isSelected ? { strokeDasharray: '4 2' } : {}
@@ -298,18 +304,49 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
         </g>
       )
     }
-    if ((a.type === 'Highlight' || a.type === 'Underline' || a.type === 'StrikeOut') && a.quads) {
+    if (a.type === 'Highlight' && a.quads) {
       return (
         <g {...common}>
           {a.quads.map((q, i) => (
+            // Quad order per PDF spec: UL, UR, LL, LR.
             <polygon
               key={i}
               points={`${q[0] * scale},${q[1] * scale} ${q[2] * scale},${q[3] * scale} ${q[6] * scale},${q[7] * scale} ${q[4] * scale},${q[5] * scale}`}
-              fill={a.type === 'Highlight' ? rgbToCss(a.style.stroke, a.style.opacity) : 'none'}
-              stroke={a.type !== 'Highlight' ? rgbToCss(a.style.stroke, 1) : 'none'}
-              strokeWidth={a.type !== 'Highlight' ? 2 : 0}
+              fill={rgbToCss(a.style.stroke, a.style.opacity)}
             />
           ))}
+        </g>
+      )
+    }
+    if ((a.type === 'Underline' || a.type === 'StrikeOut') && a.quads) {
+      const strokeW = Math.max(1, a.style.width || 1.5) * scale
+      return (
+        <g {...common}>
+          {/* Invisible fat hit-area so the thin line is still easy to click/select. */}
+          {a.quads.map((q, i) => (
+            <rect
+              key={`hit-${i}`}
+              x={Math.min(q[0], q[4]) * scale}
+              y={Math.min(q[1], q[3]) * scale}
+              width={(Math.max(q[2], q[6]) - Math.min(q[0], q[4])) * scale}
+              height={(Math.max(q[5], q[7]) - Math.min(q[1], q[3])) * scale}
+              fill="transparent"
+            />
+          ))}
+          {a.quads.map((q, i) => {
+            const y = a.type === 'Underline' ? [q[5], q[7]] : [(q[1] + q[5]) / 2, (q[3] + q[7]) / 2]
+            return (
+              <line
+                key={i}
+                x1={q[0] * scale}
+                y1={y[0] * scale}
+                x2={q[2] * scale}
+                y2={y[1] * scale}
+                stroke={rgbToCss(a.style.stroke, a.style.opacity)}
+                strokeWidth={strokeW}
+              />
+            )
+          })}
         </g>
       )
     }
@@ -370,10 +407,12 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
         position: 'absolute',
         inset: 0,
         cursor: isDrawTool ? 'crosshair' : 'default',
-        // In select mode the background must be click-through so text
-        // selection on the layer underneath works; individual shapes
-        // opt back in via pointerEvents:'auto' (see `common` below).
-        pointerEvents: tool === 'select' ? 'none' : 'auto'
+        // In select mode — and while a highlighter-style mark tool is
+        // armed — the background must be click-through so real text
+        // selection on the layer underneath works (SelectionToolbar does
+        // the marking on pointerup). Individual shapes opt back in via
+        // pointerEvents:'auto' (see `common` below).
+        pointerEvents: !editMode || tool === 'select' || MARK_TYPES.has(tool) ? 'none' : 'auto'
       }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

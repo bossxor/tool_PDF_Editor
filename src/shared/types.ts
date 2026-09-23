@@ -155,6 +155,11 @@ export interface PdfApi {
   closeTab: (tabId: string) => Promise<void>
   forTab: (tabId: string) => TabApi
   onOpenRequested: (cb: (path: string) => void) => void
+  // Electron only exposes the real filesystem path of a drag-and-dropped
+  // File through this API (contextIsolation blocks File.path directly).
+  getPathForFile: (file: File) => string
+  toggleFullscreen: () => Promise<boolean>
+  onFullscreenChange: (cb: (isFullscreen: boolean) => void) => void
 }
 
 declare global {

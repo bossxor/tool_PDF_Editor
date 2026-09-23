@@ -81,6 +81,28 @@ export default function TabsManager(): React.ReactElement {
   }, [])
 
   useEffect(() => {
+    const onDragOver = (e: DragEvent): void => {
+      e.preventDefault()
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+    }
+    const onDrop = (e: DragEvent): void => {
+      e.preventDefault()
+      const files = Array.from(e.dataTransfer?.files ?? [])
+      const pdfFiles = files.filter((f) => f.name.toLowerCase().endsWith('.pdf'))
+      for (const f of pdfFiles) {
+        const path = window.api.getPathForFile(f)
+        if (path) void openNewTab(path)
+      }
+    }
+    window.addEventListener('dragover', onDragOver)
+    window.addEventListener('drop', onDrop)
+    return () => {
+      window.removeEventListener('dragover', onDragOver)
+      window.removeEventListener('drop', onDrop)
+    }
+  }, [openNewTab])
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       const mod = e.ctrlKey || e.metaKey
       if (mod && e.key.toLowerCase() === 'w' && activeId) {

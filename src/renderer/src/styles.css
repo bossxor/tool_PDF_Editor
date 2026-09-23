@@ -114,6 +114,7 @@ button { font-family: inherit; }
   flex-shrink: 0;
 }
 .toolbar button.wide { width: auto; padding: 0 12px; gap: 6px; font-size: 12.5px; font-weight: 500; }
+.toolbar-spacer { flex: 1; min-width: 12px; }
 .toolbar button:hover:not(:disabled) { background: var(--bg-surface-3); color: var(--text); }
 .toolbar button:active:not(:disabled) { background: var(--bg-elevated); }
 .toolbar button:disabled { opacity: 0.3; cursor: default; }

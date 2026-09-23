@@ -229,6 +229,50 @@ export const IconTrash = ({ size, className }: IconProps): React.ReactElement =>
     className
   )
 
+export const IconMaximize = ({ size, className }: IconProps): React.ReactElement =>
+  base(
+    <>
+      <path d="M4 9V5a1 1 0 0 1 1-1h4" />
+      <path d="M20 9V5a1 1 0 0 0-1-1h-4" />
+      <path d="M4 15v4a1 1 0 0 0 1 1h4" />
+      <path d="M20 15v4a1 1 0 0 1-1 1h-4" />
+    </>,
+    size,
+    className
+  )
+
+export const IconMinimize = ({ size, className }: IconProps): React.ReactElement =>
+  base(
+    <>
+      <path d="M9 4v3a1 1 0 0 1-1 1H5" />
+      <path d="M15 4v3a1 1 0 0 0 1 1h3" />
+      <path d="M9 20v-3a1 1 0 0 0-1-1H5" />
+      <path d="M15 20v-3a1 1 0 0 1 1-1h3" />
+    </>,
+    size,
+    className
+  )
+
+export const IconEdit = ({ size, className }: IconProps): React.ReactElement =>
+  base(
+    <>
+      <path d="M4 20h4L18.5 9.5a2.12 2.12 0 0 0-3-3L5 17v3Z" />
+      <path d="M13.5 6.5l4 4" />
+    </>,
+    size,
+    className
+  )
+
+export const IconEye = ({ size, className }: IconProps): React.ReactElement =>
+  base(
+    <>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </>,
+    size,
+    className
+  )
+
 export const IconLock = ({ size, className }: IconProps): React.ReactElement =>
   base(
     <>

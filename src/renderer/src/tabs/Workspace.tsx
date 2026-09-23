@@ -97,6 +97,10 @@ export default function Workspace({ onOpenNewTab }: { onOpenNewTab: () => void }
         e.preventDefault()
         void redo()
       }
+      if (e.key === 'F11') {
+        e.preventDefault()
+        void window.api.toggleFullscreen()
+      }
 
       // Single-key tool shortcuts — only when not typing in a field.
       if (!mod && !e.altKey && info) {

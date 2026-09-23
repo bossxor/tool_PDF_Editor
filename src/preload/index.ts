@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { PdfApi, TabApi } from '../shared/types'
 
 function forTab(tabId: string): TabApi {
@@ -45,6 +45,11 @@ const api: PdfApi = {
   forTab,
   onOpenRequested: (cb) => {
     ipcRenderer.on('open-requested', (_e, path: string) => cb(path))
+  },
+  getPathForFile: (file) => webUtils.getPathForFile(file),
+  toggleFullscreen: () => ipcRenderer.invoke('window:toggleFullscreen'),
+  onFullscreenChange: (cb) => {
+    ipcRenderer.on('fullscreen-changed', (_e, v: boolean) => cb(v))
   }
 }
 

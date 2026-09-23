@@ -13,6 +13,7 @@ interface DocState {
   currentPage: number
   zoom: number // 1 = 100%
   fitMode: 'width' | 'page' | 'custom'
+  editMode: boolean // false = read-only viewer (default); true = annotation tools shown
 
   setLoading: (v: boolean) => void
   setError: (msg: string | null) => void
@@ -22,6 +23,7 @@ interface DocState {
   setCurrentPage: (p: number) => void
   setZoom: (z: number) => void
   setFitMode: (m: 'width' | 'page' | 'custom') => void
+  setEditMode: (v: boolean) => void
   reset: () => void
 }
 
@@ -40,6 +42,7 @@ export function createDocStore(): DocStoreHook {
     currentPage: 0,
     zoom: 1,
     fitMode: 'width',
+    editMode: false,
 
     setLoading: (v) => set({ loading: v }),
     setError: (msg) => set({ errorMessage: msg }),
@@ -50,6 +53,7 @@ export function createDocStore(): DocStoreHook {
     setCurrentPage: (p) => set({ currentPage: p }),
     setZoom: (z) => set({ zoom: z, fitMode: 'custom' }),
     setFitMode: (m) => set({ fitMode: m }),
+    setEditMode: (v) => set({ editMode: v }),
     reset: () =>
       set({
         filePath: null,

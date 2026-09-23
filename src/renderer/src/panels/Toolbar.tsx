@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useTab } from '../tabs/TabContext'
 import type { ToolId } from '../store/toolStore'
 import {
@@ -9,6 +9,9 @@ import {
   IconUndo,
   IconRedo,
   IconSelect,
+  IconHighlighter,
+  IconUnderline,
+  IconStrikethrough,
   IconSquare,
   IconCircle,
   IconLine,
@@ -18,15 +21,22 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconMinus,
-  IconPlus
+  IconPlus,
+  IconMaximize,
+  IconMinimize,
+  IconEdit,
+  IconEye
 } from '../ui/icons'
 
-// Highlight/Underline/StrikeOut are no longer here — they're applied from
-// the floating toolbar that appears when text is selected (see
-// viewer/SelectionToolbar.tsx), Adobe Acrobat-style, instead of a
-// dedicated "arm the tool, then drag a box" flow.
+// Highlight/Underline/StrikeOut: click the tool, then drag over text like a
+// highlighter pen — each drag marks the text it crosses (real selection
+// under the hood, not a drawn box) and the tool stays armed for the next
+// drag. See SelectionToolbar, which does the actual marking on pointerup.
 const TOOLS: { id: ToolId; icon: React.FC<{ size?: number }>; title: string }[] = [
   { id: 'select', icon: IconSelect, title: '선택 (V)' },
+  { id: 'Highlight', icon: IconHighlighter, title: '형광펜 (드래그로 계속 칠하기)' },
+  { id: 'Underline', icon: IconUnderline, title: '밑줄' },
+  { id: 'StrikeOut', icon: IconStrikethrough, title: '취소선' },
   { id: 'Square', icon: IconSquare, title: '사각형 (R)' },
   { id: 'Circle', icon: IconCircle, title: '원 (O)' },
   { id: 'Line', icon: IconLine, title: '선 (L)' },
@@ -54,6 +64,8 @@ export default function Toolbar({
   const fitMode = useDocStore((s) => s.fitMode)
   const setZoom = useDocStore((s) => s.setZoom)
   const setFitMode = useDocStore((s) => s.setFitMode)
+  const editMode = useDocStore((s) => s.editMode)
+  const setEditMode = useDocStore((s) => s.setEditMode)
 
   const tool = useToolStore((s) => s.tool)
   const setTool = useToolStore((s) => s.setTool)
@@ -63,6 +75,11 @@ export default function Toolbar({
   const redo = useAnnotStore((s) => s.redo)
   const dirty = useAnnotStore((s) => s.dirty)
 
+  const [fullscreen, setFullscreen] = useState(false)
+  useEffect(() => {
+    window.api.onFullscreenChange(setFullscreen)
+  }, [])
+
   const goTo = (p: number): void => {
     const el = document.querySelector(`.page[data-page="${p}"]`)
     el?.scrollIntoView({ block: 'start' })
@@ -70,6 +87,11 @@ export default function Toolbar({
   }
 
   const canAnnotate = info?.permissions.annotate ?? false
+
+  const toggleEditMode = (): void => {
+    if (editMode) setTool('select')
+    setEditMode(!editMode)
+  }
 
   return (
     <div className="toolbar">
@@ -85,25 +107,31 @@ export default function Toolbar({
       <button onClick={onPrint} disabled={!info || !info.permissions.print} title="인쇄 (Ctrl+P)">
         <IconPrint size={17} />
       </button>
-      <div className="sep" />
-      <button onClick={() => void undo()} disabled={!canUndo} title="실행 취소 (Ctrl+Z)">
-        <IconUndo size={17} />
-      </button>
-      <button onClick={() => void redo()} disabled={!canRedo} title="다시 실행 (Ctrl+Y)">
-        <IconRedo size={17} />
-      </button>
-      <div className="sep" />
-      {TOOLS.map((t) => (
-        <button
-          key={t.id}
-          title={t.title}
-          className={tool === t.id ? 'active' : ''}
-          disabled={!info || (t.id !== 'select' && !canAnnotate)}
-          onClick={() => setTool(t.id)}
-        >
-          <t.icon size={17} />
-        </button>
-      ))}
+
+      {editMode && (
+        <>
+          <div className="sep" />
+          <button onClick={() => void undo()} disabled={!canUndo} title="실행 취소 (Ctrl+Z)">
+            <IconUndo size={17} />
+          </button>
+          <button onClick={() => void redo()} disabled={!canRedo} title="다시 실행 (Ctrl+Y)">
+            <IconRedo size={17} />
+          </button>
+          <div className="sep" />
+          {TOOLS.map((t) => (
+            <button
+              key={t.id}
+              title={t.title}
+              className={tool === t.id ? 'active' : ''}
+              disabled={!info || (t.id !== 'select' && !canAnnotate)}
+              onClick={() => setTool(t.id)}
+            >
+              <t.icon size={17} />
+            </button>
+          ))}
+        </>
+      )}
+
       <div className="sep" />
       <button disabled={!info || currentPage <= 0} onClick={() => goTo(currentPage - 1)} title="이전 페이지">
         <IconChevronLeft size={17} />
@@ -129,6 +157,21 @@ export default function Toolbar({
         <option value="page">페이지 맞춤</option>
         <option value="custom">사용자 지정</option>
       </select>
+
+      <div className="toolbar-spacer" />
+
+      <button onClick={() => void window.api.toggleFullscreen()} title={fullscreen ? '전체화면 종료 (F11)' : '전체화면 (F11)'}>
+        {fullscreen ? <IconMinimize size={17} /> : <IconMaximize size={17} />}
+      </button>
+      <button
+        className={`wide ${editMode ? 'active' : ''}`}
+        onClick={toggleEditMode}
+        disabled={!info}
+        title={editMode ? '뷰어로 돌아가기' : '편집 모드로 전환'}
+      >
+        {editMode ? <IconEye size={16} /> : <IconEdit size={16} />}
+        {editMode ? '뷰어로' : '편집'}
+      </button>
     </div>
   )
 }
