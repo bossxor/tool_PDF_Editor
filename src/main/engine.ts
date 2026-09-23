@@ -34,10 +34,17 @@ function safeColor(fn: () => number[]): AnnotStyle['stroke'] {
   }
 }
 
-function applyStyle(annot: mupdf.PDFAnnotation, style: AnnotStyle): void {
-  if (style.stroke) annot.setColor(style.stroke)
-  if (annot.hasInteriorColor()) {
-    if (style.fill) annot.setInteriorColor(style.fill)
+// FreeText has no separate "interior color" concept in PDF — its /C entry
+// IS the background, so style.fill (not style.stroke) has to go through
+// setColor for that type. Every color is always written (never skipped),
+// converting "없음"(null) to an empty array, which is MuPDF's own way of
+// saying "no color" — skipping the call on null left old colors in place.
+function applyStyle(annot: mupdf.PDFAnnotation, type: AnnotType, style: AnnotStyle): void {
+  if (type === 'FreeText') {
+    annot.setColor(style.fill ?? [])
+  } else {
+    annot.setColor(style.stroke ?? [])
+    if (annot.hasInteriorColor()) annot.setInteriorColor(style.fill ?? [])
   }
   if (annot.hasBorder()) annot.setBorderWidth(style.width)
   annot.setOpacity(style.opacity)
@@ -247,12 +254,20 @@ export class EngineSession {
       id = randomUUID()
       annot.setName(id)
     }
-    const style: AnnotStyle = {
-      stroke: safeColor(() => annot.getColor()),
-      fill: annot.hasInteriorColor() ? safeColor(() => annot.getInteriorColor()) : null,
-      width: annot.hasBorder() ? annot.getBorderWidth() : 0,
-      opacity: annot.getOpacity()
-    }
+    const style: AnnotStyle =
+      type === 'FreeText'
+        ? {
+            stroke: null,
+            fill: safeColor(() => annot.getColor()),
+            width: annot.hasBorder() ? annot.getBorderWidth() : 0,
+            opacity: annot.getOpacity()
+          }
+        : {
+            stroke: safeColor(() => annot.getColor()),
+            fill: annot.hasInteriorColor() ? safeColor(() => annot.getInteriorColor()) : null,
+            width: annot.hasBorder() ? annot.getBorderWidth() : 0,
+            opacity: annot.getOpacity()
+          }
     const data: AnnotData = { id, page, type, rect, style }
     if (annot.hasQuadPoints()) data.quads = annot.getQuadPoints() as unknown as Quad8[]
     if (annot.hasLine()) {
@@ -304,13 +319,12 @@ export class EngineSession {
         annot.setDefaultAppearance('Helv', input.text.size, input.text.color ?? [0, 0, 0])
         annot.setContents(input.text.content)
         annot.setQuadding(input.text.align)
-        if (input.style.fill) annot.setColor(input.style.fill)
-        if (input.style.width) annot.setBorderWidth(input.style.width)
+        applyStyle(annot, 'FreeText', input.style)
       } else if (input.type === 'Text') {
         annot.setContents(input.contents ?? '')
-        if (input.style.stroke) annot.setColor(input.style.stroke)
+        applyStyle(annot, 'Text', input.style)
       } else {
-        applyStyle(annot, input.style)
+        applyStyle(annot, input.type, input.style)
       }
       const id = randomUUID()
       annot.setName(id)
@@ -340,12 +354,11 @@ export class EngineSession {
       if (patch.quads && annot.hasQuadPoints()) annot.setQuadPoints(patch.quads as unknown as mupdf.Quad[])
       if (patch.line && annot.hasLine()) annot.setLine(patch.line[0], patch.line[1])
       if (patch.ink && annot.hasInkList()) annot.setInkList(patch.ink as unknown as mupdf.Point[][])
-      if (patch.style) applyStyle(annot, patch.style)
+      if (patch.style) applyStyle(annot, annot.getType() as AnnotType, patch.style)
       if (patch.text) {
         annot.setDefaultAppearance('Helv', patch.text.size, patch.text.color ?? [0, 0, 0])
         annot.setContents(patch.text.content)
         annot.setQuadding(patch.text.align)
-        if (patch.style?.fill) annot.setColor(patch.style.fill)
       }
       if (patch.contents !== undefined) annot.setContents(patch.contents)
       annot.update()

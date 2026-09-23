@@ -1,6 +1,7 @@
 import React from 'react'
 import { useEffect, useRef, useState } from 'react'
 import type { TabApi } from '../../../shared/types'
+import { useTab } from '../tabs/TabContext'
 import TextLayer from './TextLayer'
 import AnnotLayer from './AnnotLayer'
 
@@ -16,6 +17,8 @@ interface Props {
 
 // Renders one page's bitmap. Only fetches from the engine while `visible`.
 export default function PageView({ api, pageIndex, width, height, scale, visible, copyAllowed }: Props): React.ReactElement {
+  const { useToolStore } = useTab()
+  const setSelected = useToolStore((s) => s.setSelected)
   const [url, setUrl] = useState<string | null>(null)
   const requestedScale = useRef(0)
 
@@ -47,7 +50,12 @@ export default function PageView({ api, pageIndex, width, height, scale, visible
   }, [])
 
   return (
-    <div className="page" style={{ width, height, position: 'relative' }} data-page={pageIndex}>
+    <div
+      className="page"
+      style={{ width, height, position: 'relative' }}
+      data-page={pageIndex}
+      onPointerDown={() => setSelected(null)}
+    >
       {url ? (
         <img src={url} width={width} height={height} draggable={false} alt={`페이지 ${pageIndex + 1}`} />
       ) : (

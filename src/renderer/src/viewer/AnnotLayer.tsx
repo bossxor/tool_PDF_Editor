@@ -165,7 +165,6 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
       await create(pageIndex, { type, rect, style })
     }
     setDrag(null)
-    useToolStore.getState().setTool('select')
   }
 
   const commitEdit = async (): Promise<void> => {
@@ -199,7 +198,7 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
         await create(pageIndex, { type: 'Text', rect: [state.rect[0], state.rect[1], state.rect[0] + 24, state.rect[1] + 24], style: state.style, contents: content })
       }
     }
-    useToolStore.getState().setTool('select')
+    if (state.id) useToolStore.getState().setTool('select')
   }
 
   const onPointerUp = (): void => {
@@ -231,7 +230,7 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
           style: a.style
         })
       },
-      style: { cursor: tool === 'select' ? 'move' : 'default' }
+      style: { cursor: tool === 'select' ? 'move' : 'default', pointerEvents: 'auto' as const }
     }
     const [x0, y0, x1, y1] = a.rect
     const sel = isSelected ? { strokeDasharray: '4 2' } : {}
@@ -365,7 +364,15 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
       ref={svgRef}
       width={width}
       height={height}
-      style={{ position: 'absolute', inset: 0, cursor: isDrawTool ? 'crosshair' : 'default' }}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        cursor: isDrawTool ? 'crosshair' : 'default',
+        // In select mode the background must be click-through so text
+        // selection on the layer underneath works; individual shapes
+        // opt back in via pointerEvents:'auto' (see `common` below).
+        pointerEvents: tool === 'select' ? 'none' : 'auto'
+      }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
