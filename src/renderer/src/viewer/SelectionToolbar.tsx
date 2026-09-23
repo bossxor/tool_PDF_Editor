@@ -4,10 +4,11 @@ import { MARK_TYPES } from './AnnotLayer'
 import { IconHighlighter, IconUnderline, IconStrikethrough } from '../ui/icons'
 import type { AnnotType } from '../../../shared/types'
 
+type Quad8 = [number, number, number, number, number, number, number, number]
+
 interface Pending {
   pageIndex: number
-  p1: [number, number]
-  p2: [number, number]
+  quads: Quad8[]
   x: number
   y: number
 }
@@ -25,8 +26,13 @@ const MARKS: { type: AnnotType; icon: React.FC<{ size?: number }>; title: string
 //     every drag is marked immediately with that tool's color the moment
 //     it's released, like dragging a real highlighter pen — the tool stays
 //     armed so the next drag keeps going without re-clicking anything.
+//
+// The marked area comes straight from the browser's own selection geometry
+// (Range.getClientRects(), one rect per visual line the selection touches),
+// converted to PDF points — not from guessing "everything between these two
+// corner points" server-side, which used to snap to the whole line.
 export default function SelectionToolbar(): React.ReactElement | null {
-  const { api, useDocStore, useToolStore, useAnnotStore } = useTab()
+  const { useDocStore, useToolStore, useAnnotStore } = useTab()
   const info = useDocStore((s) => s.info)
   const editMode = useDocStore((s) => s.editMode)
   const tool = useToolStore((s) => s.tool)
@@ -39,9 +45,8 @@ export default function SelectionToolbar(): React.ReactElement | null {
   const annotateAllowed = info?.permissions.annotate ?? false
   const armedMarkType = MARK_TYPES.has(tool) ? (tool as AnnotType) : null
 
-  const markRange = useCallback(
-    async (pageIndex: number, p1: [number, number], p2: [number, number], type: AnnotType): Promise<void> => {
-      const quads = await api.highlightQuads(pageIndex, p1, p2)
+  const markQuads = useCallback(
+    async (pageIndex: number, quads: Quad8[], type: AnnotType): Promise<void> => {
       if (quads.length === 0) return
       const xs = quads.flatMap((q) => [q[0], q[2], q[4], q[6]])
       const ys = quads.flatMap((q) => [q[1], q[3], q[5], q[7]])
@@ -49,7 +54,7 @@ export default function SelectionToolbar(): React.ReactElement | null {
       const style = styles[type] ?? { stroke: [1, 0.92, 0.3], fill: null, width: 0, opacity: 0.4 }
       await create(pageIndex, { type, rect, quads, style })
     },
-    [api, styles, create]
+    [styles, create]
   )
 
   const handleSelectionEnd = useCallback((): void => {
@@ -73,28 +78,30 @@ export default function SelectionToolbar(): React.ReactElement | null {
       setPending(null)
       return
     }
-    const rects = range.getClientRects()
+    const rects = [...range.getClientRects()].filter((r) => r.width > 0.5 && r.height > 0.5)
     if (rects.length === 0) {
       setPending(null)
       return
     }
     const pageRect = pageEl.getBoundingClientRect()
     const scale = pageRect.width / pageInfo.width
-    const first = rects[0]
-    const last = rects[rects.length - 1]
-    const p1: [number, number] = [(first.left - pageRect.left) / scale, (first.top - pageRect.top) / scale]
-    const p2: [number, number] = [(last.right - pageRect.left) / scale, (last.bottom - pageRect.top) / scale]
+    const toPdf = (x: number, y: number): [number, number] => [(x - pageRect.left) / scale, (y - pageRect.top) / scale]
+    const quads: Quad8[] = rects.map((r) => {
+      const [x0, y0] = toPdf(r.left, r.top)
+      const [x1, y1] = toPdf(r.right, r.bottom)
+      return [x0, y0, x1, y0, x0, y1, x1, y1]
+    })
 
     if (armedMarkType) {
       // Pen mode: mark immediately, clear the selection, stay armed.
       sel.removeAllRanges()
-      void markRange(pageIndex, p1, p2, armedMarkType)
+      void markQuads(pageIndex, quads, armedMarkType)
       return
     }
 
     const bounding = range.getBoundingClientRect()
-    setPending({ pageIndex, p1, p2, x: bounding.left + bounding.width / 2, y: bounding.top })
-  }, [info, armedMarkType, markRange])
+    setPending({ pageIndex, quads, x: bounding.left + bounding.width / 2, y: bounding.top })
+  }, [info, armedMarkType, markQuads])
 
   useEffect(() => {
     if (!copyAllowed || !annotateAllowed || !editMode) return
@@ -131,10 +138,10 @@ export default function SelectionToolbar(): React.ReactElement | null {
 
   const applyMark = async (type: AnnotType): Promise<void> => {
     if (!pending) return
-    const { pageIndex, p1, p2 } = pending
+    const { pageIndex, quads } = pending
     setPending(null)
     window.getSelection()?.removeAllRanges()
-    await markRange(pageIndex, p1, p2, type)
+    await markQuads(pageIndex, quads, type)
   }
 
   if (!pending || !copyAllowed || !annotateAllowed || !editMode) return null
