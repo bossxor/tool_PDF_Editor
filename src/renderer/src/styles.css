@@ -267,3 +267,20 @@ button { font-family: inherit; }
 .context-menu button:hover { background: var(--bg-surface-3); color: var(--text); }
 .context-menu button.danger { color: var(--danger); }
 .context-menu button.danger:hover { background: var(--danger-soft); }
+
+/* ---------- Selection toolbar (Adobe-style: appears over selected text) ---------- */
+.selection-toolbar {
+  position: fixed; transform: translate(-50%, -100%); display: flex; gap: 2px; padding: 4px;
+  background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg); z-index: 90; animation: popIn 110ms ease-out;
+}
+.selection-toolbar::after {
+  content: ''; position: absolute; left: 50%; bottom: -5px; transform: translateX(-50%);
+  width: 9px; height: 9px; background: var(--bg-elevated); border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border); rotate: 45deg;
+}
+.selection-toolbar button {
+  background: none; border: none; color: var(--text-dim); width: 30px; height: 30px; border-radius: var(--radius-sm);
+  cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all var(--transition);
+}
+.selection-toolbar button:hover { background: var(--bg-surface-3); color: var(--text); }

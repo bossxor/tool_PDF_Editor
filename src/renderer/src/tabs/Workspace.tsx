@@ -4,6 +4,7 @@ import { loadInfoInBundle } from './openDocument'
 import Toolbar from '../panels/Toolbar'
 import Sidebar from '../panels/Sidebar'
 import Viewer from '../viewer/Viewer'
+import SelectionToolbar from '../viewer/SelectionToolbar'
 import PasswordDialog from '../dialogs/PasswordDialog'
 import SearchBar from '../panels/SearchBar'
 import PropertyPanel from '../panels/PropertyPanel'
@@ -143,6 +144,7 @@ export default function Workspace({ onOpenNewTab }: { onOpenNewTab: () => void }
         <div className="viewer-column">
           {searchOpen && <SearchBar onClose={() => setSearchOpen(false)} />}
           <Viewer />
+          <SelectionToolbar />
         </div>
         <PropertyPanel />
       </div>

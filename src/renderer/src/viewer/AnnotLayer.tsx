@@ -18,7 +18,9 @@ interface Props {
   scale: number
 }
 
-const DRAW_TYPES = new Set(['Highlight', 'Underline', 'StrikeOut', 'Square', 'Circle', 'Line', 'Ink', 'FreeText', 'Text'])
+// Highlight/Underline/StrikeOut are created from text selection (see
+// SelectionToolbar), not by arming a tool and dragging a box.
+const DRAW_TYPES = new Set(['Square', 'Circle', 'Line', 'Ink', 'FreeText', 'Text'])
 
 function rgbToCss(c: [number, number, number] | null, opacity = 1): string {
   if (!c) return 'none'

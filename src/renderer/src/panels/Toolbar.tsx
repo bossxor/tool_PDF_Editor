@@ -9,9 +9,6 @@ import {
   IconUndo,
   IconRedo,
   IconSelect,
-  IconHighlighter,
-  IconUnderline,
-  IconStrikethrough,
   IconSquare,
   IconCircle,
   IconLine,
@@ -24,11 +21,12 @@ import {
   IconPlus
 } from '../ui/icons'
 
+// Highlight/Underline/StrikeOut are no longer here — they're applied from
+// the floating toolbar that appears when text is selected (see
+// viewer/SelectionToolbar.tsx), Adobe Acrobat-style, instead of a
+// dedicated "arm the tool, then drag a box" flow.
 const TOOLS: { id: ToolId; icon: React.FC<{ size?: number }>; title: string }[] = [
   { id: 'select', icon: IconSelect, title: '선택 (V)' },
-  { id: 'Highlight', icon: IconHighlighter, title: '형광펜' },
-  { id: 'Underline', icon: IconUnderline, title: '밑줄' },
-  { id: 'StrikeOut', icon: IconStrikethrough, title: '취소선' },
   { id: 'Square', icon: IconSquare, title: '사각형 (R)' },
   { id: 'Circle', icon: IconCircle, title: '원 (O)' },
   { id: 'Line', icon: IconLine, title: '선 (L)' },
