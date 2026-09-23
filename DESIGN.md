@@ -3,10 +3,14 @@
 > **구현 현황(2026-09-23):** 1~5단계(뷰어/비밀번호/인쇄/주석/페이지 관리) + 멀티탭 + exe 패키징 완료.
 > 엔진은 탭마다 별도의 `EngineSession` 인스턴스로 분리되어 있고(`src/main/engine.ts`),
 > 렌더러는 탭마다 독립된 Zustand 스토어 묶음(`TabBundle`)을 가진다(`src/renderer/src/tabs/`).
-> 남은 항목: 텍스트 상자 모양 직접 생성(테두리색 분리·한글 간격), `prompt()` 기반 텍스트 입력을 인라인 편집기로 교체, PDF 병합/분할.
+> 남은 항목: 텍스트 상자 모양 직접 생성(테두리색 분리·한글 간격), PDF 병합/분할.
 > **UI**: 다크 테마 디자인 시스템(`src/renderer/src/styles.css`의 CSS 변수)과 인라인 SVG 아이콘 세트(`src/renderer/src/ui/icons.tsx`)로 전면 재구성.
-> **앱 아이콘**: `build/icon.svg` 원본 → `sharp`+`png-to-ico`로 `build/icon.ico`(16~256px 멀티 사이즈) 생성, `package.json`의 `build.win.icon`에 연결.
-> **텍스트 상자/메모**: `prompt()` 대신 인라인 textarea 편집(그리기 직후 자동 진입, 기존 주석은 더블클릭으로 재진입, Esc 취소·포커스 아웃 저장)으로 교체 완료.
+> **앱 아이콘**: `build/icon.svg` 원본 → `sharp`+`png-to-ico`로 `build/icon.ico`(16~256px 멀티 사이즈) 생성, `package.json`의 `build.win.icon`에 연결. `npm run icon`으로 재생성.
+> **텍스트 상자/메모**: `prompt()` 대신 인라인 textarea 편집(그리기 직후 자동 진입, 기존 주석은 더블클릭으로 재진입, Esc 취소·포커스 아웃 저장).
+> **형광펜/밑줄/취소선**: 두 가지 경로 — (1) 선택 도구로 텍스트 드래그 선택 → 뜨는 플로팅 툴바에서 클릭, (2) 도구모음에서 해당 도구를 클릭해 고정(arm)한 뒤 텍스트를 드래그하면 즉시 그 스타일로 마킹되고 도구가 계속 고정 상태로 남아 연속 드래그 가능 (`viewer/SelectionToolbar.tsx`). 밑줄/취소선은 실제 선(쿼드 박스 아님)으로 렌더링.
+> **뷰어/편집 모드**: 기본은 읽기 전용 뷰어(주석 도구·속성 패널 숨김, 기존 주석은 보이되 클릭 불가) — 우측 상단 "편집" 버튼으로 전환 (`docStore.editMode`).
+> **드래그 앤 드롭**: 파일 탐색기에서 PDF를 창에 끌어다 놓으면 새 탭으로 열림 (`webUtils.getPathForFile`, preload 경유).
+> **전체화면**: 우측 상단 버튼 + F11.
 
 ## 0. 확정 사항
 | 항목 | 결정 |
