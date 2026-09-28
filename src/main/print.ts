@@ -7,7 +7,7 @@ export interface PrintOptions {
   currentPage: number
 }
 
-function parseRange(spec: string, pageCount: number): number[] {
+export function parseRange(spec: string, pageCount: number): number[] {
   const out = new Set<number>()
   for (const part of spec.split(',')) {
     const trimmed = part.trim()

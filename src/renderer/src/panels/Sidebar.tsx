@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useTab } from '../tabs/TabContext'
 import type { OutlineItem, TabApi } from '../../../shared/types'
-import { IconRotateLeft, IconRotateRight, IconCopy, IconTrash } from '../ui/icons'
+import { IconRotateLeft, IconRotateRight, IconCopy, IconTrash, IconPlus, IconSaveAs } from '../ui/icons'
 
 function Thumb({
   api,
@@ -93,6 +93,8 @@ export default function Sidebar({ onPagesChanged }: { onPagesChanged: () => Prom
   const outline = useDocStore((s) => s.outline)
   const currentPage = useDocStore((s) => s.currentPage)
   const setCurrentPage = useDocStore((s) => s.setCurrentPage)
+  const setError = useDocStore((s) => s.setError)
+  const [extractRange, setExtractRange] = useState<string | null>(null)
   const [tab, setTab] = useState<'thumbs' | 'outline'>('thumbs')
   const [version, setVersion] = useState(0)
   const [menu, setMenu] = useState<{ index: number; x: number; y: number } | null>(null)
@@ -117,6 +119,20 @@ export default function Sidebar({ onPagesChanged }: { onPagesChanged: () => Prom
   const duplicate = async (index: number): Promise<void> => {
     await api.duplicatePage(index)
     await afterEdit()
+  }
+
+  const insertPdf = async (after: number): Promise<void> => {
+    setMenu(null)
+    const r = await api.insertPdf(after)
+    if (r.error) setError(r.error)
+    if (r.ok) await afterEdit()
+  }
+
+  const extract = async (): Promise<void> => {
+    if (extractRange === null) return
+    const r = await api.extractPages(extractRange)
+    if (r.error) setError(r.error)
+    else setExtractRange(null)
   }
 
   const remove = async (index: number): Promise<void> => {
@@ -188,9 +204,44 @@ export default function Sidebar({ onPagesChanged }: { onPagesChanged: () => Prom
           <button onClick={() => void duplicate(menu.index).then(() => setMenu(null))}>
             <IconCopy size={15} /> 페이지 복제
           </button>
+          <button onClick={() => void insertPdf(menu.index)}>
+            <IconPlus size={15} /> 뒤에 PDF 삽입 (병합)
+          </button>
+          <button
+            onClick={() => {
+              setExtractRange(String(menu.index + 1))
+              setMenu(null)
+            }}
+          >
+            <IconSaveAs size={15} /> 페이지 추출 (분할)
+          </button>
           <button className="danger" onClick={() => void remove(menu.index)}>
             <IconTrash size={15} /> 페이지 삭제
           </button>
+        </div>
+      )}
+      {extractRange !== null && (
+        <div className="modal-backdrop" onClick={(e) => e.stopPropagation()}>
+          <div className="modal">
+            <h3>페이지 추출</h3>
+            <p>새 PDF로 저장할 페이지 (전체 {info.pageCount}페이지)</p>
+            <input
+              autoFocus
+              value={extractRange}
+              placeholder="예: 1-3,5"
+              onChange={(e) => setExtractRange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void extract()
+                if (e.key === 'Escape') setExtractRange(null)
+              }}
+            />
+            <div className="modal-actions">
+              <button onClick={() => setExtractRange(null)}>취소</button>
+              <button className="primary" onClick={() => void extract()}>
+                저장
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </aside>

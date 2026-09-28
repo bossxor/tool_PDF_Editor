@@ -471,6 +471,34 @@ export class EngineSession {
     }
   }
 
+  /** Merge: insert every page of another PDF after `afterIndex` (-1 = at the start). Returns the page count inserted. */
+  insertPdf(afterIndex: number, srcPath: string): number {
+    const d = this.requireDoc()
+    const src = mupdf.Document.openDocument(fs.readFileSync(srcPath), 'application/pdf').asPDF()
+    if (!src) throw new Error('PDF 문서가 아닙니다.')
+    // ponytail: encrypted source files are refused; add a password prompt if anyone needs it.
+    if (src.needsPassword()) throw new Error('암호가 걸린 PDF는 삽입할 수 없습니다.')
+    const n = src.countPages()
+    d.beginOperation('insert-pdf')
+    try {
+      for (let i = 0; i < n; i++) d.graftPage(afterIndex + 1 + i, src, i)
+      this.markDirty()
+    } finally {
+      d.endOperation()
+    }
+    return n
+  }
+
+  /** Split: write the given pages (0-based, in order) to a new unencrypted PDF. */
+  extractPages(indices: number[], targetPath: string): void {
+    const d = this.requireDoc()
+    const out = new mupdf.PDFDocument()
+    for (const i of indices) out.graftPage(-1, d, i)
+    const tmp = targetPath + '.tmp'
+    fs.writeFileSync(tmp, out.saveToBuffer('garbage,compress').asUint8Array())
+    fs.renameSync(tmp, targetPath)
+  }
+
   // ---------- Save ----------
 
   private buildSaveOptions(encryption: SaveOptions['encryption']): string {

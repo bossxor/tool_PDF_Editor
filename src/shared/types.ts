@@ -139,6 +139,8 @@ export interface TabApi {
   deletePage: (page: number) => Promise<void>
   reorderPages: (order: number[]) => Promise<void>
   duplicatePage: (page: number) => Promise<void>
+  insertPdf: (after: number) => Promise<{ ok: boolean; count?: number; error?: string }>
+  extractPages: (range: string) => Promise<{ ok: boolean; path?: string; error?: string }>
 
   save: (opts: { encryption: SaveOptions['encryption'] }) => Promise<{ ok: boolean; path?: string }>
   saveAs: (opts: { encryption: SaveOptions['encryption'] }) => Promise<{ ok: boolean; path?: string }>

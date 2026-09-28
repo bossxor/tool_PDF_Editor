@@ -28,6 +28,8 @@ function forTab(tabId: string): TabApi {
     deletePage: (page) => ipcRenderer.invoke('page:delete', tabId, page),
     reorderPages: (order) => ipcRenderer.invoke('page:reorder', tabId, order),
     duplicatePage: (page) => ipcRenderer.invoke('page:duplicate', tabId, page),
+    insertPdf: (after) => ipcRenderer.invoke('page:insertPdf', tabId, after),
+    extractPages: (range) => ipcRenderer.invoke('page:extract', tabId, range),
 
     save: (opts) => ipcRenderer.invoke('doc:save', tabId, opts),
     saveAs: (opts) => ipcRenderer.invoke('doc:saveAs', tabId, opts),

@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { join } from 'node:path'
 import { EngineSession } from './engine'
-import { printDocument } from './print'
+import { parseRange, printDocument } from './print'
 
 let mainWindow: BrowserWindow | null = null
 let pendingOpenPaths: string[] = []
@@ -135,6 +135,37 @@ function registerIpc(): void {
   ipcMain.handle('page:delete', async (_e, tabId: string, page: number) => getSession(tabId).deletePage(page))
   ipcMain.handle('page:reorder', async (_e, tabId: string, order: number[]) => getSession(tabId).reorderPages(order))
   ipcMain.handle('page:duplicate', async (_e, tabId: string, page: number) => getSession(tabId).duplicatePage(page))
+
+  ipcMain.handle('page:insertPdf', async (_e, tabId: string, after: number) => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      title: '삽입할 PDF 선택',
+      properties: ['openFile'],
+      filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    })
+    if (result.canceled || result.filePaths.length === 0) return { ok: false }
+    try {
+      return { ok: true, count: getSession(tabId).insertPdf(after, result.filePaths[0]) }
+    } catch (e) {
+      return { ok: false, error: String((e as Error)?.message ?? e) }
+    }
+  })
+  ipcMain.handle('page:extract', async (_e, tabId: string, range: string) => {
+    const session = getSession(tabId)
+    const indices = parseRange(range, session.getInfo().pageCount)
+    if (indices.length === 0) return { ok: false, error: '페이지 범위가 올바르지 않습니다.' }
+    const base = (session.getFilePath() ?? 'document.pdf').replace(/\.pdf$/i, '')
+    const result = await dialog.showSaveDialog(mainWindow!, {
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+      defaultPath: `${base}_p${range.replace(/[^0-9,-]/g, '')}.pdf`
+    })
+    if (result.canceled || !result.filePath) return { ok: false }
+    try {
+      session.extractPages(indices, result.filePath)
+      return { ok: true, path: result.filePath }
+    } catch (e) {
+      return { ok: false, error: String((e as Error)?.message ?? e) }
+    }
+  })
 
   ipcMain.handle('doc:save', async (_e, tabId: string, opts: any) => {
     const session = getSession(tabId)

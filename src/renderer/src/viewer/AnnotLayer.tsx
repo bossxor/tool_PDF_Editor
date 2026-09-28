@@ -30,6 +30,46 @@ function rgbToCss(c: [number, number, number] | null, opacity = 1): string {
   return `rgba(${r},${g},${b},${opacity})`
 }
 
+type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'p0' | 'p1'
+const RECT_HANDLES: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+const RESIZABLE = new Set(['Square', 'Circle', 'FreeText', 'Line'])
+
+type Rect = [number, number, number, number]
+
+/** Geometry change for dragging `orig` by (dx, dy) — a move without a handle, a resize with one. */
+export function dragPatch(orig: AnnotData, dx: number, dy: number, handle?: Handle): Partial<AnnotData> {
+  const [x0, y0, x1, y1] = orig.rect
+  if (orig.type === 'Line' && orig.line) {
+    const [a, b] = orig.line
+    const line: [[number, number], [number, number]] = [
+      handle === 'p1' ? a : [a[0] + dx, a[1] + dy],
+      handle === 'p0' ? b : [b[0] + dx, b[1] + dy]
+    ]
+    const rect: Rect = [
+      Math.min(line[0][0], line[1][0]),
+      Math.min(line[0][1], line[1][1]),
+      Math.max(line[0][0], line[1][0]),
+      Math.max(line[0][1], line[1][1])
+    ]
+    return { line, rect }
+  }
+  if (handle) {
+    const nx0 = handle.includes('w') ? x0 + dx : x0
+    const nx1 = handle.includes('e') ? x1 + dx : x1
+    const ny0 = handle.includes('n') ? y0 + dy : y0
+    const ny1 = handle.includes('s') ? y1 + dy : y1
+    // Dragging past the opposite edge flips instead of producing a negative box.
+    return { rect: [Math.min(nx0, nx1), Math.min(ny0, ny1), Math.max(nx0, nx1), Math.max(ny0, ny1)] }
+  }
+  if (orig.type === 'Ink' && orig.ink) {
+    return { ink: orig.ink.map((stroke) => stroke.map(([x, y]) => [x + dx, y + dy] as [number, number])) }
+  }
+  if (orig.quads) {
+    return { quads: orig.quads.map((q) => q.map((v, i) => (i % 2 === 0 ? v + dx : v + dy)) as typeof q) }
+  }
+  return { rect: [x0 + dx, y0 + dy, x1 + dx, y1 + dy] }
+}
+
 export default function AnnotLayer({ pageIndex, width, height, scale }: Props): React.ReactElement {
   const { api, useDocStore, useToolStore, useAnnotStore } = useTab()
   const editMode = useDocStore((s) => s.editMode)
@@ -49,7 +89,16 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
   const [drag, setDrag] = useState<{ start: [number, number]; cur: [number, number]; ink: [number, number][] } | null>(
     null
   )
-  const [moving, setMoving] = useState<{ id: string; start: [number, number]; orig: AnnotData; dx: number; dy: number } | null>(null)
+  // Drag on the shape body moves it; drag on a handle resizes it. Both
+  // preview locally and write once on release.
+  const [moving, setMoving] = useState<{
+    id: string
+    start: [number, number]
+    orig: AnnotData
+    dx: number
+    dy: number
+    handle?: Handle
+  } | null>(null)
   const [editing, setEditing] = useState<EditingState | null>(null)
   const editCancelledRef = useRef(false)
 
@@ -114,26 +163,10 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
 
   const commitMove = async (): Promise<void> => {
     if (!moving) return
-    const { id, orig, dx, dy } = moving
+    const { id, orig, dx, dy, handle } = moving
     setMoving(null)
     if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return // plain click, nothing moved
-    if (orig.type === 'Ink' && orig.ink) {
-      const ink = orig.ink.map((stroke) => stroke.map(([x, y]) => [x + dx, y + dy] as [number, number]))
-      await update(pageIndex, id, { ink })
-    } else if (orig.type === 'Line' && orig.line) {
-      const line: [[number, number], [number, number]] = [
-        [orig.line[0][0] + dx, orig.line[0][1] + dy],
-        [orig.line[1][0] + dx, orig.line[1][1] + dy]
-      ]
-      const [x0, y0, x1, y1] = orig.rect
-      await update(pageIndex, id, { line, rect: [x0 + dx, y0 + dy, x1 + dx, y1 + dy] })
-    } else if ((orig.type === 'Highlight' || orig.type === 'Underline' || orig.type === 'StrikeOut') && orig.quads) {
-      const quads = orig.quads.map((q) => q.map((v, i) => (i % 2 === 0 ? v + dx : v + dy)) as typeof q)
-      await update(pageIndex, id, { quads })
-    } else {
-      const [x0, y0, x1, y1] = orig.rect
-      await update(pageIndex, id, { rect: [x0 + dx, y0 + dy, x1 + dx, y1 + dy] })
-    }
+    await update(pageIndex, id, dragPatch(orig, dx, dy, handle))
   }
 
   const commitDraw = async (): Promise<void> => {
@@ -419,6 +452,48 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
     return <g key={a.id} />
   }
 
+  const renderHandles = (): React.ReactElement | null => {
+    if (!editMode || tool !== 'select' || !selectedId || editing) return null
+    const base = (annots ?? []).find((a) => a.id === selectedId)
+    if (!base || !RESIZABLE.has(base.type)) return null
+    const a = moving?.id === base.id ? { ...base, ...dragPatch(moving.orig, moving.dx, moving.dy, moving.handle) } : base
+    const [x0, y0, x1, y1] = a.rect
+    const mx = (x0 + x1) / 2
+    const my = (y0 + y1) / 2
+    const pos: Partial<Record<Handle, [number, number]>> =
+      a.type === 'Line' && a.line
+        ? { p0: a.line[0], p1: a.line[1] }
+        : { nw: [x0, y0], n: [mx, y0], ne: [x1, y0], e: [x1, my], se: [x1, y1], s: [mx, y1], sw: [x0, y1], w: [x0, my] }
+    const cursor = (h: Handle): string =>
+      h === 'p0' || h === 'p1' ? 'crosshair' : h === 'n' || h === 's' ? 'ns-resize' : h === 'e' || h === 'w' ? 'ew-resize' : h === 'nw' || h === 'se' ? 'nwse-resize' : 'nesw-resize'
+    const S = 8
+    return (
+      <g>
+        {(a.type === 'Line' ? (['p0', 'p1'] as Handle[]) : RECT_HANDLES).map((h) => {
+          const [hx, hy] = pos[h]!
+          return (
+            <rect
+              key={h}
+              x={hx * scale - S / 2}
+              y={hy * scale - S / 2}
+              width={S}
+              height={S}
+              fill="#fff"
+              stroke="#4c8bf5"
+              strokeWidth={1.5}
+              style={{ cursor: cursor(h), pointerEvents: 'auto' }}
+              onPointerDown={(e) => {
+                e.stopPropagation()
+                ;(e.target as Element).setPointerCapture(e.pointerId)
+                setMoving({ id: base.id, start: toPdf(e.clientX, e.clientY), orig: base, dx: 0, dy: 0, handle: h })
+              }}
+            />
+          )
+        })}
+      </g>
+    )
+  }
+
   return (
     <svg
       ref={svgRef}
@@ -440,14 +515,9 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
       onPointerUp={onPointerUp}
     >
       {(annots ?? []).map((a) =>
-        moving?.id === a.id ? (
-          <g key={a.id} transform={`translate(${moving.dx * scale} ${moving.dy * scale})`}>
-            {renderShape(a)}
-          </g>
-        ) : (
-          renderShape(a)
-        )
+        moving?.id === a.id ? renderShape({ ...a, ...dragPatch(moving.orig, moving.dx, moving.dy, moving.handle) }) : renderShape(a)
       )}
+      {renderHandles()}
       {drag && tool === 'Ink' && (
         <polyline
           points={drag.ink.map(([x, y]) => `${x * scale},${y * scale}`).join(' ')}
