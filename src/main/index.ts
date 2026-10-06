@@ -134,15 +134,23 @@ function registerIpc(): void {
   ipcMain.handle('page:reorder', async (_e, tabId: string, order: number[]) => getSession(tabId).reorderPages(order))
   ipcMain.handle('page:duplicate', async (_e, tabId: string, page: number) => getSession(tabId).duplicatePage(page))
 
-  ipcMain.handle('page:insertPdf', async (_e, tabId: string, after: number) => {
-    const result = await dialog.showOpenDialog(mainWindow!, {
-      title: '삽입할 PDF 선택',
-      properties: ['openFile'],
-      filters: [{ name: 'PDF', extensions: ['pdf'] }]
-    })
-    if (result.canceled || result.filePaths.length === 0) return { ok: false }
+  // First call (no path) shows the file dialog; if the chosen PDF is
+  // encrypted the renderer asks for a password and calls again with path+password.
+  ipcMain.handle('page:insertPdf', async (_e, tabId: string, after: number, path?: string, password?: string) => {
+    if (!path) {
+      const result = await dialog.showOpenDialog(mainWindow!, {
+        title: '삽입할 PDF 선택',
+        properties: ['openFile'],
+        filters: [{ name: 'PDF', extensions: ['pdf'] }]
+      })
+      if (result.canceled || result.filePaths.length === 0) return { ok: false }
+      path = result.filePaths[0]
+    }
     try {
-      return { ok: true, count: getSession(tabId).insertPdf(after, result.filePaths[0]) }
+      const r = getSession(tabId).insertPdf(after, path, password)
+      if (r === 'needsPassword') return { ok: false, needsPassword: true, path }
+      if (r === 'wrongPassword') return { ok: false, needsPassword: true, path, error: '비밀번호가 틀렸습니다.' }
+      return { ok: true, count: r }
     } catch (e) {
       return { ok: false, error: String((e as Error)?.message ?? e) }
     }

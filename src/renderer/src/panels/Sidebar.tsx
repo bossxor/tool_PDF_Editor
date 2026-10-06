@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useTab } from '../tabs/TabContext'
 import type { OutlineItem, TabApi } from '../../../shared/types'
 import ConfirmDialog from '../dialogs/ConfirmDialog'
+import PasswordDialog from '../dialogs/PasswordDialog'
 import { IconRotateLeft, IconRotateRight, IconCopy, IconTrash, IconPlus, IconSaveAs } from '../ui/icons'
 
 function Thumb({
@@ -123,9 +124,16 @@ export default function Sidebar({ onPagesChanged }: { onPagesChanged: () => Prom
     await afterEdit()
   }
 
-  const insertPdf = async (after: number): Promise<void> => {
+  const [mergePw, setMergePw] = useState<{ after: number; path: string; error: string | null } | null>(null)
+
+  const insertPdf = async (after: number, path?: string, password?: string): Promise<void> => {
     setMenu(null)
-    const r = await api.insertPdf(after)
+    const r = await api.insertPdf(after, path, password)
+    if (r.needsPassword && r.path) {
+      setMergePw({ after, path: r.path, error: r.error ?? null })
+      return
+    }
+    setMergePw(null)
     if (r.error) setError(r.error)
     if (r.ok) await afterEdit()
   }
@@ -227,6 +235,13 @@ export default function Sidebar({ onPagesChanged }: { onPagesChanged: () => Prom
             <IconTrash size={15} /> 페이지 삭제
           </button>
         </div>
+      )}
+      {mergePw && (
+        <PasswordDialog
+          error={mergePw.error}
+          onSubmit={(pw) => void insertPdf(mergePw.after, mergePw.path, pw)}
+          onCancel={() => setMergePw(null)}
+        />
       )}
       {deleteIndex !== null && (
         <ConfirmDialog

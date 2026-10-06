@@ -467,12 +467,14 @@ export class EngineSession {
   }
 
   /** Merge: insert every page of another PDF after `afterIndex` (-1 = at the start). Returns the page count inserted. */
-  insertPdf(afterIndex: number, srcPath: string): number {
+  insertPdf(afterIndex: number, srcPath: string, password?: string): number | 'needsPassword' | 'wrongPassword' {
     const d = this.requireDoc()
     const src = mupdf.Document.openDocument(fs.readFileSync(srcPath), 'application/pdf').asPDF()
     if (!src) throw new Error('PDF 문서가 아닙니다.')
-    // ponytail: encrypted source files are refused; add a password prompt if anyone needs it.
-    if (src.needsPassword()) throw new Error('암호가 걸린 PDF는 삽입할 수 없습니다.')
+    if (src.needsPassword()) {
+      if (password === undefined) return 'needsPassword'
+      if (!src.authenticatePassword(password)) return 'wrongPassword'
+    }
     const n = src.countPages()
     d.beginOperation('insert-pdf')
     try {
