@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useTab } from '../tabs/TabContext'
 import type { OutlineItem, TabApi } from '../../../shared/types'
+import ConfirmDialog from '../dialogs/ConfirmDialog'
 import { IconRotateLeft, IconRotateRight, IconCopy, IconTrash, IconPlus, IconSaveAs } from '../ui/icons'
 
 function Thumb({
@@ -94,6 +95,7 @@ export default function Sidebar({ onPagesChanged }: { onPagesChanged: () => Prom
   const currentPage = useDocStore((s) => s.currentPage)
   const setCurrentPage = useDocStore((s) => s.setCurrentPage)
   const setError = useDocStore((s) => s.setError)
+  const [deleteIndex, setDeleteIndex] = useState<number | null>(null)
   const [extractRange, setExtractRange] = useState<string | null>(null)
   const [tab, setTab] = useState<'thumbs' | 'outline'>('thumbs')
   const [version, setVersion] = useState(0)
@@ -137,10 +139,16 @@ export default function Sidebar({ onPagesChanged }: { onPagesChanged: () => Prom
 
   const remove = async (index: number): Promise<void> => {
     if (info && info.pageCount <= 1) return
-    if (!window.confirm(`${index + 1}페이지를 삭제하시겠습니까?`)) return
+    setMenu(null)
+    setDeleteIndex(index)
+  }
+
+  const confirmDelete = async (): Promise<void> => {
+    if (deleteIndex === null) return
+    const index = deleteIndex
+    setDeleteIndex(null)
     await api.deletePage(index)
     await afterEdit()
-    setMenu(null)
   }
 
   const reorder = async (from: number, to: number): Promise<void> => {
@@ -219,6 +227,17 @@ export default function Sidebar({ onPagesChanged }: { onPagesChanged: () => Prom
             <IconTrash size={15} /> 페이지 삭제
           </button>
         </div>
+      )}
+      {deleteIndex !== null && (
+        <ConfirmDialog
+          title={`${deleteIndex + 1}페이지를 삭제할까요?`}
+          message="저장하면 삭제한 페이지를 복구할 수 없습니다."
+          buttons={[
+            { key: 'cancel', label: '취소' },
+            { key: 'delete', label: '삭제', variant: 'danger' }
+          ]}
+          onChoose={(k) => (k === 'delete' ? void confirmDelete() : setDeleteIndex(null))}
+        />
       )}
       {extractRange !== null && (
         <div className="modal-backdrop" onClick={(e) => e.stopPropagation()}>

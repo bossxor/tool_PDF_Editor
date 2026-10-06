@@ -1,5 +1,5 @@
 import { create, type UseBoundStore, type StoreApi } from 'zustand'
-import type { DocInfo, OutlineItem } from '../../../shared/types'
+import type { DocInfo, OutlineItem, SearchHit } from '../../../shared/types'
 
 interface DocState {
   filePath: string | null
@@ -15,6 +15,9 @@ interface DocState {
   fitMode: 'width' | 'page' | 'custom'
   editMode: boolean // false = read-only viewer (default); true = annotation tools shown
 
+  search: { hits: SearchHit[]; index: number } | null // one hit per match, highlighted on the pages
+
+  setSearch: (s: { hits: SearchHit[]; index: number } | null) => void
   setLoading: (v: boolean) => void
   setError: (msg: string | null) => void
   setOpened: (filePath: string, needsPassword: boolean) => void
@@ -43,12 +46,14 @@ export function createDocStore(): DocStoreHook {
     zoom: 1,
     fitMode: 'width',
     editMode: false,
+    search: null,
 
+    setSearch: (search) => set({ search }),
     setLoading: (v) => set({ loading: v }),
     setError: (msg) => set({ errorMessage: msg }),
     setOpened: (filePath, needsPassword) =>
       set({ filePath, needsPassword, passwordError: null, info: null, currentPage: 0 }),
-    setInfo: (info, outline) => set({ info, outline, needsPassword: false }),
+    setInfo: (info, outline) => set({ info, outline, needsPassword: false, search: null }),
     setPasswordError: (msg) => set({ passwordError: msg }),
     setCurrentPage: (p) => set({ currentPage: p }),
     setZoom: (z) => set({ zoom: z, fitMode: 'custom' }),

@@ -6,7 +6,20 @@ import { createToolStore } from '../store/toolStore'
 import { openDocumentInBundle } from './openDocument'
 import Workspace from './Workspace'
 import TabBar from './TabBar'
+import ConfirmDialog, { type ConfirmButton } from '../dialogs/ConfirmDialog'
 import { IconFileText, IconOpen } from '../ui/icons'
+
+interface Ask {
+  title: string
+  message?: string
+  items?: string[]
+  buttons: ConfirmButton[]
+  resolve: (key: string) => void
+}
+
+function baseName(p: string | null): string {
+  return p ? (p.split(/[\\/]/).pop() ?? p) : '(이름 없음)'
+}
 
 interface TabEntry {
   id: string
@@ -24,6 +37,52 @@ export default function TabsManager(): React.ReactElement {
   const [activeId, setActiveId] = useState<string | null>(null)
   const tabsRef = useRef(tabs)
   tabsRef.current = tabs
+  const [ask, setAsk] = useState<Ask | null>(null)
+
+  const confirm = useCallback(
+    (opts: Omit<Ask, 'resolve'>) => new Promise<string>((resolve) => setAsk({ ...opts, resolve })),
+    []
+  )
+
+  // Saves one tab in place; reports failure on that tab's toast.
+  const saveTab = async (entry: TabEntry): Promise<boolean> => {
+    try {
+      const r = await entry.bundle.api.save({ encryption: 'keep' })
+      if (r.ok) {
+        entry.bundle.useAnnotStore.setState({ dirty: false })
+        return true
+      }
+    } catch {
+      /* fall through */
+    }
+    setActiveId(entry.id)
+    entry.bundle.useDocStore.getState().setError('저장에 실패했습니다. 다른 프로그램에서 파일을 열고 있는지 확인하세요.')
+    return false
+  }
+
+  useEffect(() => {
+    window.api.onCloseRequested(() => {
+      void (async () => {
+        const dirty: TabEntry[] = []
+        for (const t of tabsRef.current) if (await t.bundle.api.isDirty()) dirty.push(t)
+        if (dirty.length === 0) return void window.api.forceClose()
+        const choice = await confirm({
+          title: '저장하지 않은 변경 사항이 있습니다',
+          message: '종료하기 전에 저장할까요?',
+          items: dirty.map((t) => baseName(t.bundle.useDocStore.getState().filePath)),
+          buttons: [
+            { key: 'cancel', label: '취소' },
+            { key: 'discard', label: '저장 안 함', variant: 'danger' },
+            { key: 'save', label: '모두 저장 후 종료', variant: 'primary' }
+          ]
+        })
+        if (choice === 'cancel') return
+        if (choice === 'save') for (const t of dirty) if (!(await saveTab(t))) return
+        void window.api.forceClose()
+      })()
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const openNewTab = useCallback(async (path?: string) => {
     const id = genId()
@@ -53,10 +112,18 @@ export default function TabsManager(): React.ReactElement {
     async (id: string) => {
       const entry = tabsRef.current.find((t) => t.id === id)
       if (entry) {
-        const dirty = entry.bundle.useAnnotStore.getState().dirty
-        if (dirty) {
-          const ok = window.confirm('저장하지 않은 변경 사항이 있습니다. 그래도 탭을 닫으시겠습니까?')
-          if (!ok) return
+        if (await entry.bundle.api.isDirty()) {
+          const choice = await confirm({
+            title: '저장하지 않은 변경 사항이 있습니다',
+            message: `"${baseName(entry.bundle.useDocStore.getState().filePath)}" 탭을 닫기 전에 저장할까요?`,
+            buttons: [
+              { key: 'cancel', label: '취소' },
+              { key: 'discard', label: '저장 안 함', variant: 'danger' },
+              { key: 'save', label: '저장 후 닫기', variant: 'primary' }
+            ]
+          })
+          if (choice === 'cancel') return
+          if (choice === 'save' && !(await saveTab(entry))) return
         }
       }
       await window.api.closeTab(id)
@@ -70,7 +137,7 @@ export default function TabsManager(): React.ReactElement {
         return next
       })
     },
-    [activeId]
+    [activeId, confirm]
   )
 
   useEffect(() => {
@@ -122,6 +189,19 @@ export default function TabsManager(): React.ReactElement {
     return () => window.removeEventListener('keydown', onKey)
   }, [activeId, closeTab])
 
+  const dialog = ask && (
+    <ConfirmDialog
+      title={ask.title}
+      message={ask.message}
+      items={ask.items}
+      buttons={ask.buttons}
+      onChoose={(k) => {
+        setAsk(null)
+        ask.resolve(k)
+      }}
+    />
+  )
+
   if (tabs.length === 0) {
     return (
       <div className="landing">
@@ -133,6 +213,7 @@ export default function TabsManager(): React.ReactElement {
         <button onClick={() => void openFileDialog()}>
           <IconOpen size={15} /> 파일 열기
         </button>
+        {dialog}
       </div>
     )
   }
@@ -153,6 +234,7 @@ export default function TabsManager(): React.ReactElement {
           <Workspace onOpenNewTab={() => void openFileDialog()} />
         </TabProvider>
       )}
+      {dialog}
     </div>
   )
 }

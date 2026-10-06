@@ -50,6 +50,10 @@ const api: PdfApi = {
   },
   getPathForFile: (file) => webUtils.getPathForFile(file),
   toggleFullscreen: () => ipcRenderer.invoke('window:toggleFullscreen'),
+  forceClose: () => ipcRenderer.invoke('window:forceClose'),
+  onCloseRequested: (cb) => {
+    ipcRenderer.on('close-requested', () => cb())
+  },
   onFullscreenChange: (cb) => {
     ipcRenderer.on('fullscreen-changed', (_e, v: boolean) => cb(v))
   }

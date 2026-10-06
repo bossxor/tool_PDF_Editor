@@ -17,7 +17,8 @@ interface Props {
 
 // Renders one page's bitmap. Only fetches from the engine while `visible`.
 export default function PageView({ api, pageIndex, width, height, scale, visible, copyAllowed }: Props): React.ReactElement {
-  const { useToolStore } = useTab()
+  const { useToolStore, useDocStore } = useTab()
+  const search = useDocStore((s) => s.search)
   const setSelected = useToolStore((s) => s.setSelected)
   const [url, setUrl] = useState<string | null>(null)
   const requestedScale = useRef(0)
@@ -60,6 +61,22 @@ export default function PageView({ api, pageIndex, width, height, scale, visible
         <img src={url} width={width} height={height} draggable={false} alt={`페이지 ${pageIndex + 1}`} />
       ) : (
         <div className="page-placeholder" style={{ width, height }} />
+      )}
+      {search?.hits.map((h, hi) =>
+        h.page !== pageIndex
+          ? null
+          : h.quads.map((q, qi) => (
+              <div
+                key={`${hi}-${qi}`}
+                className={hi === search.index ? 'search-hit current' : 'search-hit'}
+                style={{
+                  left: Math.min(q[0], q[4]) * scale,
+                  top: Math.min(q[1], q[3]) * scale,
+                  width: (Math.max(q[2], q[6]) - Math.min(q[0], q[4])) * scale,
+                  height: (Math.max(q[5], q[7]) - Math.min(q[1], q[3])) * scale
+                }}
+              />
+            ))
       )}
       <TextLayer api={api} pageIndex={pageIndex} scale={scale} visible={visible} copyAllowed={copyAllowed} />
       {visible && <AnnotLayer pageIndex={pageIndex} width={width} height={height} scale={scale} />}

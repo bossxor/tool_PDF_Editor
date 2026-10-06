@@ -32,7 +32,7 @@ function rgbToCss(c: [number, number, number] | null, opacity = 1): string {
 
 type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'p0' | 'p1'
 const RECT_HANDLES: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
-const RESIZABLE = new Set(['Square', 'Circle', 'FreeText', 'Line'])
+const RESIZABLE = new Set(['Square', 'Circle', 'FreeText', 'Line', 'Ink'])
 
 type Rect = [number, number, number, number]
 
@@ -59,7 +59,17 @@ export function dragPatch(orig: AnnotData, dx: number, dy: number, handle?: Hand
     const ny0 = handle.includes('n') ? y0 + dy : y0
     const ny1 = handle.includes('s') ? y1 + dy : y1
     // Dragging past the opposite edge flips instead of producing a negative box.
-    return { rect: [Math.min(nx0, nx1), Math.min(ny0, ny1), Math.max(nx0, nx1), Math.max(ny0, ny1)] }
+    const rect: Rect = [Math.min(nx0, nx1), Math.min(ny0, ny1), Math.max(nx0, nx1), Math.max(ny0, ny1)]
+    if (orig.type === 'Ink' && orig.ink) {
+      // Strokes have no box of their own: map every point from the old bbox into the new one.
+      const sx = x1 > x0 ? (nx1 - nx0) / (x1 - x0) : 1
+      const sy = y1 > y0 ? (ny1 - ny0) / (y1 - y0) : 1
+      const ink = orig.ink.map((stroke) =>
+        stroke.map(([x, y]) => [nx0 + (x - x0) * sx, ny0 + (y - y0) * sy] as [number, number])
+      )
+      return { ink, rect }
+    }
+    return { rect }
   }
   if (orig.type === 'Ink' && orig.ink) {
     return { ink: orig.ink.map((stroke) => stroke.map(([x, y]) => [x + dx, y + dy] as [number, number])) }

@@ -17,6 +17,8 @@ function getSession(tabId: string): EngineSession {
   return s
 }
 
+let forceClose = false
+
 function anyDirty(): boolean {
   return [...sessions.values()].some((s) => s.getIsDirty())
 }
@@ -53,16 +55,12 @@ function createWindow(): void {
     }
   })
 
+  // The confirmation UI lives in the renderer (ConfirmDialog); it calls
+  // 'window:forceClose' once the user has decided.
   mainWindow.on('close', (e) => {
-    if (anyDirty()) {
-      const choice = dialog.showMessageBoxSync(mainWindow!, {
-        type: 'question',
-        buttons: ['종료', '취소'],
-        defaultId: 1,
-        cancelId: 1,
-        message: '저장하지 않은 변경 사항이 있습니다. 그래도 종료하시겠습니까?'
-      })
-      if (choice === 1) e.preventDefault()
+    if (!forceClose && anyDirty()) {
+      e.preventDefault()
+      mainWindow?.webContents.send('close-requested')
     }
   })
 
@@ -192,6 +190,11 @@ function registerIpc(): void {
       await printDocument(mainWindow!, getSession(tabId), opts)
     }
   )
+
+  ipcMain.handle('window:forceClose', () => {
+    forceClose = true
+    mainWindow?.close()
+  })
 
   ipcMain.handle('window:toggleFullscreen', () => {
     const next = !mainWindow!.isFullScreen()

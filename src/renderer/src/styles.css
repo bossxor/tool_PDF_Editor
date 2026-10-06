@@ -285,3 +285,26 @@ button { font-family: inherit; }
   cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all var(--transition);
 }
 .selection-toolbar button:hover { background: var(--bg-surface-3); color: var(--text); }
+
+/* ---------- Confirm dialog ---------- */
+.modal.confirm { width: 400px; }
+.confirm-head { display: flex; gap: 14px; align-items: flex-start; }
+.confirm-icon {
+  flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--danger-soft); color: var(--danger);
+}
+.confirm-head h3 { margin: 2px 0 6px; }
+.confirm-msg { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-dim); }
+.confirm-items {
+  list-style: none; margin: 14px 0 0; padding: 8px 10px; max-height: 120px; overflow: auto;
+  background: var(--bg-surface-3); border: 1px solid var(--border-soft); border-radius: var(--radius-sm);
+  font-size: 12.5px; color: var(--text);
+}
+.confirm-items li { padding: 3px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.confirm-items li::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 8px; border-radius: 50%; background: var(--danger); }
+.modal-actions button.danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+.modal-actions button.danger:hover { background: #ff5252; color: #fff; }
+
+/* ---------- Search hits ---------- */
+.search-hit { position: absolute; pointer-events: none; background: rgba(255, 213, 79, 0.45); border-radius: 2px; mix-blend-mode: multiply; }
+.search-hit.current { background: rgba(255, 138, 60, 0.6); outline: 2px solid rgba(255, 138, 60, 0.9); }

@@ -282,3 +282,6 @@ export const IconLock = ({ size, className }: IconProps): React.ReactElement =>
     size,
     className
   )
+
+export const IconAlert = ({ size, className }: IconProps): React.ReactElement =>
+  base(<path d="M12 4 3 20h18L12 4Zm0 6v5m0 3v.01" />, size, className)

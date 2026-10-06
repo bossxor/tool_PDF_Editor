@@ -249,13 +249,8 @@ export class EngineSession {
     const hits: SearchHit[] = []
     for (let i = 0; i < count; i++) {
       const page = d.loadPage(i)
-      const results = page.search(query, {})
-      if (results.length > 0) {
-        const quads: Quad8[] = []
-        for (const group of results) {
-          for (const q of group) quads.push(q as unknown as Quad8)
-        }
-        hits.push({ page: i, quads })
+      for (const group of page.search(query, {})) {
+        hits.push({ page: i, quads: group as unknown as Quad8[] })
       }
     }
     return hits
