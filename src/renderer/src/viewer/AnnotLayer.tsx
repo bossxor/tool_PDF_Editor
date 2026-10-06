@@ -320,11 +320,14 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
     }
     const [x0, y0, x1, y1] = a.rect
     const sel = isSelected ? { strokeDasharray: '4 2' } : {}
+    // Unfilled shapes only hit on their hairline stroke: add an invisible
+    // fat stroke on top so they are easy to grab.
+    const hit = { fill: 'none', stroke: 'transparent', strokeWidth: Math.max(a.style.width * scale, 10) }
 
     if (a.type === 'Square') {
       return (
+        <g {...common}>
         <rect
-          {...common}
           x={x0 * scale}
           y={y0 * scale}
           width={(x1 - x0) * scale}
@@ -334,12 +337,14 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
           strokeWidth={a.style.width * scale}
           {...sel}
         />
+        <rect x={x0 * scale} y={y0 * scale} width={(x1 - x0) * scale} height={(y1 - y0) * scale} {...hit} />
+        </g>
       )
     }
     if (a.type === 'Circle') {
       return (
+        <g {...common}>
         <ellipse
-          {...common}
           cx={((x0 + x1) / 2) * scale}
           cy={((y0 + y1) / 2) * scale}
           rx={((x1 - x0) / 2) * scale}
@@ -349,12 +354,14 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
           strokeWidth={a.style.width * scale}
           {...sel}
         />
+        <ellipse cx={((x0 + x1) / 2) * scale} cy={((y0 + y1) / 2) * scale} rx={((x1 - x0) / 2) * scale} ry={((y1 - y0) / 2) * scale} {...hit} />
+        </g>
       )
     }
     if (a.type === 'Line' && a.line) {
       return (
+        <g {...common}>
         <line
-          {...common}
           x1={a.line[0][0] * scale}
           y1={a.line[0][1] * scale}
           x2={a.line[1][0] * scale}
@@ -363,6 +370,8 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
           strokeWidth={a.style.width * scale}
           {...sel}
         />
+        <line x1={a.line[0][0] * scale} y1={a.line[0][1] * scale} x2={a.line[1][0] * scale} y2={a.line[1][1] * scale} {...hit} />
+        </g>
       )
     }
     if (a.type === 'Ink' && a.ink) {
