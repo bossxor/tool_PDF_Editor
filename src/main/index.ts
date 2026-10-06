@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { join } from 'node:path'
 import { EngineSession } from './engine'
@@ -5,6 +6,7 @@ import { parseRange, printDocument } from './print'
 
 let mainWindow: BrowserWindow | null = null
 let pendingOpenPaths: string[] = []
+const launchedWithFile = process.argv.some((a) => a.toLowerCase().endsWith('.pdf'))
 const sessions = new Map<string, EngineSession>()
 
 function isDev(): boolean {
@@ -198,6 +200,13 @@ function registerIpc(): void {
       await printDocument(mainWindow!, getSession(tabId), opts)
     }
   )
+
+  // Startup info for tab restore: skipped when the app was launched to open a
+  // specific file (file association / drag onto exe); missing files are dropped.
+  ipcMain.handle('app:startup', (_e, saved: string[]) => ({
+    launchedWithFile: launchedWithFile,
+    existing: saved.filter((p) => fs.existsSync(p))
+  }))
 
   ipcMain.handle('window:forceClose', () => {
     forceClose = true

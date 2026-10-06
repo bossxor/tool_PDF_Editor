@@ -165,6 +165,7 @@ export interface PdfApi {
   // File through this API (contextIsolation blocks File.path directly).
   getPathForFile: (file: File) => string
   toggleFullscreen: () => Promise<boolean>
+  startupInfo: (saved: string[]) => Promise<{ launchedWithFile: boolean; existing: string[] }>
   forceClose: () => Promise<void>
   onCloseRequested: (cb: () => void) => void
   onFullscreenChange: (cb: (isFullscreen: boolean) => void) => void

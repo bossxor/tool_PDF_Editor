@@ -6,7 +6,7 @@ import { createToolStore } from '../store/toolStore'
 import { openDocumentInBundle } from './openDocument'
 import Workspace from './Workspace'
 import TabBar from './TabBar'
-import { addRecent, getRecent } from './recent'
+import { addRecent, getOpenTabs, getRecent, saveOpenTabs } from './recent'
 import ConfirmDialog, { type ConfirmButton } from '../dialogs/ConfirmDialog'
 import { IconFileText, IconOpen } from '../ui/icons'
 
@@ -85,6 +85,17 @@ export default function TabsManager(): React.ReactElement {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Remember which files are open so the next start can reopen them.
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const persistSoon = useCallback((): void => {
+    clearTimeout(persistTimer.current)
+    persistTimer.current = setTimeout(() => {
+      saveOpenTabs(
+        tabsRef.current.map((t) => t.bundle.useDocStore.getState().filePath).filter((p): p is string => !!p)
+      )
+    }, 600) // after the tab's document has registered its path
+  }, [])
+
   const openNewTab = useCallback(async (path?: string) => {
     const id = genId()
     await window.api.createTab(id)
@@ -97,6 +108,7 @@ export default function TabsManager(): React.ReactElement {
       useToolStore: createToolStore()
     }
     if (path) addRecent(path)
+    persistSoon()
     setTabs((t) => [...t, { id, bundle }])
     setActiveId(id)
     if (path) void openDocumentInBundle(bundle, path)
@@ -129,6 +141,7 @@ export default function TabsManager(): React.ReactElement {
         }
       }
       await window.api.closeTab(id)
+      persistSoon()
       setTabs((t) => {
         const idx = t.findIndex((x) => x.id === id)
         const next = t.filter((x) => x.id !== id)
@@ -139,8 +152,17 @@ export default function TabsManager(): React.ReactElement {
         return next
       })
     },
-    [activeId, confirm]
+    [activeId, confirm, persistSoon]
   )
+
+  useEffect(() => {
+    // Restore last session's tabs unless this launch was to open a specific file.
+    void window.api.startupInfo(getOpenTabs()).then(({ launchedWithFile, existing }) => {
+      if (launchedWithFile || tabsRef.current.length > 0) return
+      for (const p of existing) void openNewTab(p)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     window.api.onOpenRequested((path) => {
