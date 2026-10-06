@@ -46,8 +46,42 @@ function applyStyle(annot: mupdf.PDFAnnotation, type: AnnotType, style: AnnotSty
     annot.setColor(style.stroke ?? [])
     if (annot.hasInteriorColor()) annot.setInteriorColor(style.fill ?? [])
   }
-  if (annot.hasBorder()) annot.setBorderWidth(style.width)
+  if (type !== 'FreeText' && annot.hasBorder()) annot.setBorderWidth(style.width)
   annot.setOpacity(style.opacity)
+}
+
+// MuPDF draws a FreeText's border in the *text* colour, so a border colour of
+// its own is made from a companion Square annotation named "<id>#b" that
+// follows the FreeText (rect, style, delete). It is hidden from the UI list;
+// all changes happen inside the caller's single undo operation.
+const BORDER_SUFFIX = '#b'
+
+function isCompanion(a: mupdf.PDFAnnotation): boolean {
+  return a.getName().endsWith(BORDER_SUFFIX)
+}
+
+function syncBorder(page: mupdf.PDFPage, annot: mupdf.PDFAnnotation, id: string, style?: AnnotStyle): void {
+  let comp = page.getAnnotations().find((a) => a.getName() === id + BORDER_SUFFIX) ?? null
+  if (style) {
+    annot.setBorderWidth(0)
+    if (style.stroke && style.width > 0) {
+      if (!comp) {
+        comp = page.createAnnotation('Square')
+        comp.setName(id + BORDER_SUFFIX)
+      }
+      comp.setColor(style.stroke)
+      comp.setInteriorColor([])
+      comp.setBorderWidth(style.width)
+      comp.setOpacity(1)
+    } else if (comp) {
+      page.deleteAnnotation(comp)
+      comp = null
+    }
+  }
+  if (comp) {
+    comp.setRect(annot.getRect())
+    comp.update()
+  }
 }
 
 function computeFallbackRect(annot: mupdf.PDFAnnotation): [number, number, number, number] {
@@ -258,7 +292,7 @@ export class EngineSession {
 
   // ---------- Annotations ----------
 
-  private annotToData(page: number, annot: mupdf.PDFAnnotation): AnnotData {
+  private annotToData(page: number, annot: mupdf.PDFAnnotation, companion?: mupdf.PDFAnnotation | null): AnnotData {
     const type = annot.getType() as AnnotType
     const rect = annot.hasRect() ? annot.getRect() : computeFallbackRect(annot)
     let id = annot.getName()
@@ -268,12 +302,7 @@ export class EngineSession {
     }
     const style: AnnotStyle =
       type === 'FreeText'
-        ? {
-            stroke: null,
-            fill: safeColor(() => annot.getColor()),
-            width: annot.hasBorder() ? annot.getBorderWidth() : 0,
-            opacity: annot.getOpacity()
-          }
+        ? this.freeTextStyle(annot, companion)
         : {
             stroke: safeColor(() => annot.getColor()),
             fill: annot.hasInteriorColor() ? safeColor(() => annot.getInteriorColor()) : null,
@@ -303,10 +332,28 @@ export class EngineSession {
     return data
   }
 
+  private freeTextStyle(annot: mupdf.PDFAnnotation, companion?: mupdf.PDFAnnotation | null): AnnotStyle {
+    const fill = safeColor(() => annot.getColor())
+    if (companion) {
+      return { stroke: safeColor(() => companion.getColor()), fill, width: companion.getBorderWidth(), opacity: annot.getOpacity() }
+    }
+    // Files made before companions existed: MuPDF's own border, drawn in the text colour.
+    const width = annot.hasBorder() ? annot.getBorderWidth() : 0
+    return { stroke: width > 0 ? safeColor(() => annot.getDefaultAppearance().color) : null, fill, width, opacity: annot.getOpacity() }
+  }
+
+  private companionFor(page: mupdf.PDFPage, id: string): mupdf.PDFAnnotation | null {
+    return page.getAnnotations().find((a) => a.getName() === id + BORDER_SUFFIX) ?? null
+  }
+
   listAnnots(pageIndex: number): AnnotData[] {
     const d = this.requireDoc()
     const page = d.loadPage(pageIndex)
-    return page.getAnnotations().map((a) => this.annotToData(pageIndex, a))
+    const all = page.getAnnotations()
+    const comps = new Map(all.filter(isCompanion).map((a) => [a.getName(), a]))
+    return all
+      .filter((a) => !isCompanion(a))
+      .map((a) => this.annotToData(pageIndex, a, comps.get(a.getName() + BORDER_SUFFIX)))
   }
 
   createAnnot(pageIndex: number, input: NewAnnotInput): AnnotData {
@@ -341,9 +388,10 @@ export class EngineSession {
       const id = randomUUID()
       annot.setName(id)
       annot.update()
+      if (input.type === 'FreeText') syncBorder(page, annot, id, input.style)
       page.update()
       this.markDirty()
-      return this.annotToData(pageIndex, annot)
+      return this.annotToData(pageIndex, annot, input.type === 'FreeText' ? this.companionFor(page, id) : null)
     } finally {
       d.endOperation()
     }
@@ -374,9 +422,11 @@ export class EngineSession {
       }
       if (patch.contents !== undefined) annot.setContents(patch.contents)
       annot.update()
+      const isFreeText = annot.getType() === 'FreeText'
+      if (isFreeText) syncBorder(page, annot, id, patch.style)
       page.update()
       this.markDirty()
-      return this.annotToData(pageIndex, annot)
+      return this.annotToData(pageIndex, annot, isFreeText ? this.companionFor(page, id) : null)
     } finally {
       d.endOperation()
     }
@@ -387,6 +437,8 @@ export class EngineSession {
     const { page, annot } = this.findAnnot(pageIndex, id)
     d.beginOperation('delete-annot')
     try {
+      const comp = this.companionFor(page, id)
+      if (comp) page.deleteAnnotation(comp)
       page.deleteAnnotation(annot)
       this.markDirty()
     } finally {

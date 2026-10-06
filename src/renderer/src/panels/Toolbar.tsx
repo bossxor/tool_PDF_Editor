@@ -136,7 +136,29 @@ export default function Toolbar({
       <button disabled={!info || currentPage <= 0} onClick={() => goTo(currentPage - 1)} title="이전 페이지">
         <IconChevronLeft size={17} />
       </button>
-      <span className="page-indicator">{info ? `${currentPage + 1} / ${info.pageCount}` : '- / -'}</span>
+      <span className="page-indicator">
+        {info ? (
+          <>
+            <input
+              key={currentPage}
+              className="page-input"
+              defaultValue={currentPage + 1}
+              title="페이지 번호 입력 후 Enter"
+              onFocus={(e) => e.currentTarget.select()}
+              onKeyDown={(e) => {
+                e.stopPropagation()
+                if (e.key !== 'Enter') return
+                const n = parseInt(e.currentTarget.value, 10)
+                if (n >= 1) goTo(Math.min(n, info.pageCount) - 1)
+                e.currentTarget.blur()
+              }}
+            />{' '}
+            / {info.pageCount}
+          </>
+        ) : (
+          '- / -'
+        )}
+      </span>
       <button
         disabled={!info || currentPage >= (info?.pageCount ?? 1) - 1}
         onClick={() => goTo(currentPage + 1)}

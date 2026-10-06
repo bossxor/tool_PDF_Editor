@@ -65,7 +65,7 @@ export default function PropertyPanel(): React.ReactElement | null {
   }
 
   const hasFill = ['Square', 'Circle', 'FreeText'].includes(target)
-  const hasStroke = !['FreeText'].includes(target)
+  const hasStroke = true
   const hasWidth = !['Highlight'].includes(target)
 
   return (
@@ -73,7 +73,7 @@ export default function PropertyPanel(): React.ReactElement | null {
       <h4>{selected ? '주석 속성' : '도구 스타일'}</h4>
       {hasStroke && (
         <ColorField
-          label={target === 'FreeText' ? '테두리' : '테두리/선 색'}
+          label={target === 'FreeText' ? '테두리 색' : '테두리/선 색'}
           value={style.stroke}
           onChange={(c) => apply({ stroke: c })}
           allowNone
@@ -111,6 +111,28 @@ export default function PropertyPanel(): React.ReactElement | null {
           onChange={(e) => apply({ opacity: Number(e.target.value) })}
         />
       </label>
+      {selected?.type === 'FreeText' && selected.text && (
+        <>
+          <ColorField
+            label="글자색"
+            value={selected.text.color ?? [0, 0, 0]}
+            onChange={(c) => void updateAnnot(selected.page, selected.id, { text: { ...selected.text!, color: c } })}
+          />
+          <label className="field">
+            <span>글자 크기 {selected.text.size}pt</span>
+            <input
+              type="range"
+              min={8}
+              max={48}
+              step={1}
+              value={selected.text.size}
+              onChange={(e) =>
+                void updateAnnot(selected.page, selected.id, { text: { ...selected.text!, size: Number(e.target.value) } })
+              }
+            />
+          </label>
+        </>
+      )}
       {selected && (
         <button
           className="danger"

@@ -80,6 +80,10 @@ export function dragPatch(orig: AnnotData, dx: number, dy: number, handle?: Hand
   return { rect: [x0 + dx, y0 + dy, x1 + dx, y1 + dy] }
 }
 
+// Copy/paste buffer shared by every tab; each paste is nudged further so copies don't stack.
+let clipboard: AnnotData | null = null
+let pasteCount = 0
+
 export default function AnnotLayer({ pageIndex, width, height, scale }: Props): React.ReactElement {
   const { api, useDocStore, useToolStore, useAnnotStore } = useTab()
   const editMode = useDocStore((s) => s.editMode)
@@ -124,21 +128,60 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
     setMoving(null)
   }, [zoom, fitMode])
 
+  const pick = (a: AnnotData): void => {
+    useToolStore.getState().setTool('select')
+    setSelected(a.id)
+  }
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (editing || !editMode) return
-      if (e.key !== 'Delete' || !selectedId) return
-      // Every visible page mounts its own AnnotLayer — only the page that
-      // actually owns the selected annotation may act on it.
-      if (!(annots ?? []).some((a) => a.id === selectedId)) return
       const tag = (e.target as HTMLElement | null)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-      void remove(pageIndex, selectedId)
-      setSelected(null)
+      const mod = e.ctrlKey || e.metaKey
+      const k = e.key.toLowerCase()
+
+      // Paste lands on the page being viewed; only that page's layer acts.
+      if (mod && k === 'v') {
+        if (clipboard && pageIndex === useDocStore.getState().currentPage) {
+          e.preventDefault()
+          pasteCount += 1
+          const d = 12 * pasteCount
+          const src = clipboard
+          const [x0, y0, x1, y1] = src.rect
+          void create(pageIndex, {
+            type: src.type,
+            style: src.style,
+            text: src.text,
+            contents: src.contents,
+            rect: [x0 + d, y0 + d, x1 + d, y1 + d],
+            ...dragPatch(src, d, d)
+          } as NewAnnotInput).then(pick)
+        }
+        return
+      }
+
+      // Every visible page mounts its own AnnotLayer — only the page that
+      // actually owns the selected annotation may act on it.
+      if (!selectedId || !(annots ?? []).some((a) => a.id === selectedId)) return
+      const owner = (annots ?? []).find((a) => a.id === selectedId)!
+      if (e.key === 'Delete') {
+        void remove(pageIndex, selectedId)
+        setSelected(null)
+      } else if (mod && k === 'c' && !MARK_TYPES.has(owner.type)) {
+        clipboard = owner
+        pasteCount = 0
+      } else if (!mod && e.key.startsWith('Arrow')) {
+        e.preventDefault()
+        const step = e.shiftKey ? 10 : 1
+        const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0
+        const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0
+        void update(pageIndex, owner.id, dragPatch(owner, dx, dy))
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, pageIndex, remove, setSelected, editing, editMode, annots])
+  }, [selectedId, pageIndex, remove, update, create, setSelected, editing, editMode, annots, useDocStore])
 
   const toPdf = (clientX: number, clientY: number): [number, number] => {
     const rect = svgRef.current!.getBoundingClientRect()
@@ -181,11 +224,6 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
 
   // Like Acrobat: once a shape is placed, drop back to the select tool with
   // the new shape selected, so it can be dragged/resized right away.
-  const pick = (a: AnnotData): void => {
-    useToolStore.getState().setTool('select')
-    setSelected(a.id)
-  }
-
   const commitDraw = async (): Promise<void> => {
     if (!drag) return
     const [sx, sy] = drag.start

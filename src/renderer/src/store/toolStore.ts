@@ -11,7 +11,7 @@ const DEFAULT_STYLES: Record<string, AnnotStyle> = {
   Circle: { stroke: [0.9, 0.1, 0.1], fill: null, width: 2, opacity: 1 },
   Line: { stroke: [0.1, 0.1, 0.1], fill: null, width: 2, opacity: 1, lineEnd: 'None' },
   Ink: { stroke: [0.9, 0.1, 0.1], fill: null, width: 2, opacity: 1 },
-  FreeText: { stroke: null, fill: [1, 1, 0.6], width: 1, opacity: 1 },
+  FreeText: { stroke: [0, 0, 0], fill: [1, 1, 0.6], width: 1, opacity: 1 },
   Text: { stroke: [1, 0.85, 0.3], fill: null, width: 0, opacity: 1 }
 }
 

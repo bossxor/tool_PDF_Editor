@@ -6,6 +6,7 @@ import { createToolStore } from '../store/toolStore'
 import { openDocumentInBundle } from './openDocument'
 import Workspace from './Workspace'
 import TabBar from './TabBar'
+import { addRecent, getRecent } from './recent'
 import ConfirmDialog, { type ConfirmButton } from '../dialogs/ConfirmDialog'
 import { IconFileText, IconOpen } from '../ui/icons'
 
@@ -95,6 +96,7 @@ export default function TabsManager(): React.ReactElement {
       useAnnotStore: createAnnotStore(api),
       useToolStore: createToolStore()
     }
+    if (path) addRecent(path)
     setTabs((t) => [...t, { id, bundle }])
     setActiveId(id)
     if (path) void openDocumentInBundle(bundle, path)
@@ -213,6 +215,16 @@ export default function TabsManager(): React.ReactElement {
         <button onClick={() => void openFileDialog()}>
           <IconOpen size={15} /> 파일 열기
         </button>
+        {getRecent().length > 0 && (
+          <div className="recent">
+            <h4>최근 파일</h4>
+            {getRecent().map((p) => (
+              <button key={p} title={p} onClick={() => void openNewTab(p)}>
+                {baseName(p)}
+              </button>
+            ))}
+          </div>
+        )}
         {dialog}
       </div>
     )

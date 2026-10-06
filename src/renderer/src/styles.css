@@ -308,3 +308,18 @@ button { font-family: inherit; }
 /* ---------- Search hits ---------- */
 .search-hit { position: absolute; pointer-events: none; background: rgba(255, 213, 79, 0.45); border-radius: 2px; mix-blend-mode: multiply; }
 .search-hit.current { background: rgba(255, 138, 60, 0.6); outline: 2px solid rgba(255, 138, 60, 0.9); }
+
+/* ---------- Page jump input / recent files ---------- */
+.page-input {
+  width: 34px; padding: 2px 4px; text-align: center; font: inherit; color: var(--text);
+  background: var(--bg-surface-3); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.page-input:focus { outline: none; border-color: var(--accent); }
+.recent { width: 360px; max-width: 80vw; margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+.recent h4 { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--text-faint); }
+.landing .recent button {
+  display: block; width: 100%; text-align: left; padding: 8px 12px; background: var(--bg-surface-2);
+  color: var(--text); border: 1px solid var(--border-soft); font-size: 12.5px; font-weight: 500; box-shadow: none;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transform: none;
+}
+.landing .recent button:hover { background: var(--bg-elevated); border-color: var(--accent); transform: none; }
