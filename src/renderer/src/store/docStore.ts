@@ -13,6 +13,7 @@ interface DocState {
   currentPage: number
   zoom: number // 1 = 100%
   fitMode: 'width' | 'page' | 'custom'
+  twoPage: boolean // facing-pages layout
   editMode: boolean // false = read-only viewer (default); true = annotation tools shown
 
   search: { hits: SearchHit[]; index: number } | null // one hit per match, highlighted on the pages
@@ -27,6 +28,7 @@ interface DocState {
   setZoom: (z: number) => void
   setFitMode: (m: 'width' | 'page' | 'custom') => void
   setEditMode: (v: boolean) => void
+  setTwoPage: (v: boolean) => void
   reset: () => void
 }
 
@@ -46,6 +48,7 @@ export function createDocStore(): DocStoreHook {
     zoom: 1,
     fitMode: 'width',
     editMode: false,
+    twoPage: false,
     search: null,
 
     setSearch: (search) => set({ search }),
@@ -59,6 +62,7 @@ export function createDocStore(): DocStoreHook {
     setZoom: (z) => set({ zoom: z, fitMode: 'custom' }),
     setFitMode: (m) => set({ fitMode: m }),
     setEditMode: (v) => set({ editMode: v }),
+    setTwoPage: (v) => set({ twoPage: v }),
     reset: () =>
       set({
         filePath: null,

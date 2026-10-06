@@ -12,6 +12,7 @@ export default function Viewer(): React.ReactElement {
   const [contentVersion, setContentVersion] = useState(0)
   const zoom = useDocStore((s) => s.zoom)
   const fitMode = useDocStore((s) => s.fitMode)
+  const twoPage = useDocStore((s) => s.twoPage)
   const setCurrentPage = useDocStore((s) => s.setCurrentPage)
   const setZoom = useDocStore((s) => s.setZoom)
 
@@ -39,31 +40,42 @@ export default function Viewer(): React.ReactElement {
 
   const effectiveZoom = useMemo(() => {
     if (!info || info.pages.length === 0) return zoom
+    const cols = twoPage ? 2 : 1
     if (fitMode === 'width') {
       const maxPageWidth = Math.max(...info.pages.map((p) => p.width))
-      return Math.max(0.1, (containerWidth - 32) / maxPageWidth)
+      return Math.max(0.1, (containerWidth - 32 - (cols - 1) * PAGE_GAP) / (cols * maxPageWidth))
     }
     if (fitMode === 'page') {
       const p = info.pages[0]
-      return Math.max(0.1, Math.min((containerWidth - 32) / p.width, (viewportHeight - 32) / p.height))
+      return Math.max(
+        0.1,
+        Math.min((containerWidth - 32 - (cols - 1) * PAGE_GAP) / (cols * p.width), (viewportHeight - 32) / p.height)
+      )
     }
     return zoom
-  }, [fitMode, zoom, containerWidth, viewportHeight, info])
+  }, [fitMode, zoom, containerWidth, viewportHeight, info, twoPage])
 
   const layout = useMemo(() => {
     if (!info) return { total: 0, offsets: [] as number[], sizes: [] as { w: number; h: number }[] }
     let y = 0
     const offsets: number[] = []
     const sizes: { w: number; h: number }[] = []
-    for (const p of info.pages) {
-      offsets.push(y)
-      const w = p.width * effectiveZoom
-      const h = p.height * effectiveZoom
-      sizes.push({ w, h })
-      y += h + PAGE_GAP
+    const n = info.pages.length
+    // Facing pages: pages 0,1 share a row, 2,3 the next, ... A row is as tall as its taller page.
+    const step = twoPage ? 2 : 1
+    for (let i = 0; i < n; i += step) {
+      let rowH = 0
+      for (let j = i; j < Math.min(n, i + step); j++) {
+        offsets.push(y)
+        const w = info.pages[j].width * effectiveZoom
+        const h = info.pages[j].height * effectiveZoom
+        sizes.push({ w, h })
+        rowH = Math.max(rowH, h)
+      }
+      y += rowH + PAGE_GAP
     }
     return { total: y, offsets, sizes }
-  }, [info, effectiveZoom])
+  }, [info, effectiveZoom, twoPage])
 
   const onScroll = (): void => {
     const el = containerRef.current
@@ -105,7 +117,19 @@ export default function Viewer(): React.ReactElement {
           if (i < first || i > last) return null
           const { w, h } = layout.sizes[i]
           return (
-            <div key={i} className="page-wrap" style={{ position: 'absolute', top: layout.offsets[i], left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
+            <div
+              key={i}
+              className="page-wrap"
+              style={{
+                position: 'absolute',
+                top: layout.offsets[i],
+                // facing pages meet at the centre line, PAGE_GAP apart
+                left: twoPage && i % 2 === 1 ? `calc(50% + ${PAGE_GAP / 2}px)` : 0,
+                right: twoPage && i % 2 === 0 ? `calc(50% + ${PAGE_GAP / 2}px)` : 0,
+                display: 'flex',
+                justifyContent: twoPage ? (i % 2 === 0 ? 'flex-end' : 'flex-start') : 'center'
+              }}
+            >
               <PageView
                 key={`${i}-${contentVersion}`}
                 api={api}

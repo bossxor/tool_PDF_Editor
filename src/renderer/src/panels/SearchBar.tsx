@@ -7,6 +7,7 @@ export default function SearchBar({ onClose }: { onClose: () => void }): React.R
   const { api, useDocStore } = useTab()
   const info = useDocStore((s) => s.info)
   const search = useDocStore((s) => s.search)
+  const twoPage = useDocStore((s) => s.twoPage)
   const setSearch = useDocStore((s) => s.setSearch)
   const [query, setQuery] = useState('')
   const lastQuery = useRef('')
@@ -22,7 +23,10 @@ export default function SearchBar({ onClose }: { onClose: () => void }): React.R
     if (!viewer || !content || !anyPage || !info) return
     const scale = anyPage.getBoundingClientRect().width / info.pages[Number(anyPage.dataset.page)].width
     let y = content.getBoundingClientRect().top - viewer.getBoundingClientRect().top + viewer.scrollTop
-    for (let i = 0; i < hit.page; i++) y += info.pages[i].height * scale + 12
+    const step = twoPage ? 2 : 1
+    for (let i = 0; i < hit.page - (hit.page % step); i += step) {
+      y += Math.max(...info.pages.slice(i, i + step).map((p) => p.height)) * scale + 12
+    }
     const top = Math.min(...hit.quads.flatMap((q) => [q[1], q[3], q[5], q[7]]))
     viewer.scrollTop = y + top * scale - viewer.clientHeight / 3
   }

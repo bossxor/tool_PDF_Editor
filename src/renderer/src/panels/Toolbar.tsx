@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useTab } from '../tabs/TabContext'
 import type { ToolId } from '../store/toolStore'
 import {
+  IconColumns,
   IconOpen,
   IconSave,
   IconSaveAs,
@@ -62,6 +63,8 @@ export default function Toolbar({
   const setCurrentPage = useDocStore((s) => s.setCurrentPage)
   const zoom = useDocStore((s) => s.zoom)
   const fitMode = useDocStore((s) => s.fitMode)
+  const twoPage = useDocStore((s) => s.twoPage)
+  const setTwoPage = useDocStore((s) => s.setTwoPage)
   const setZoom = useDocStore((s) => s.setZoom)
   const setFitMode = useDocStore((s) => s.setFitMode)
   const editMode = useDocStore((s) => s.editMode)
@@ -179,6 +182,9 @@ export default function Toolbar({
         <option value="page">페이지 맞춤</option>
         <option value="custom">사용자 지정</option>
       </select>
+      <button className={twoPage ? 'active' : ''} onClick={() => setTwoPage(!twoPage)} disabled={!info} title="두 페이지씩 보기">
+        <IconColumns size={17} />
+      </button>
 
       <div className="toolbar-spacer" />
 
