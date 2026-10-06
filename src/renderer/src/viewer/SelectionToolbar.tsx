@@ -59,32 +59,23 @@ export default function SelectionToolbar(): React.ReactElement | null {
     [styles, create]
   )
 
-  const handleSelectionEnd = useCallback((): void => {
+  // Reads the live browser selection as PDF-space quads at the CURRENT
+  // zoom. Nothing is cached across zoom changes: the selection itself lives
+  // in the DOM and survives re-scaling, so we just re-read it.
+  const readSelection = useCallback((): (Pending & { bounding: DOMRect }) | null => {
     const sel = window.getSelection()
-    if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
-      setPending(null)
-      return
-    }
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0 || !info) return null
     const range = sel.getRangeAt(0)
     const anchorEl = (range.commonAncestorContainer.nodeType === 3
       ? range.commonAncestorContainer.parentElement
       : (range.commonAncestorContainer as Element)) as Element | null
     const pageEl = anchorEl?.closest('.page') as HTMLElement | null
-    if (!pageEl || !info) {
-      setPending(null)
-      return
-    }
+    if (!pageEl) return null
     const pageIndex = Number(pageEl.dataset.page)
     const pageInfo = info.pages[pageIndex]
-    if (!pageInfo) {
-      setPending(null)
-      return
-    }
+    if (!pageInfo) return null
     const rects = [...range.getClientRects()].filter((r) => r.width > 0.5 && r.height > 0.5)
-    if (rects.length === 0) {
-      setPending(null)
-      return
-    }
+    if (rects.length === 0) return null
     const pageRect = pageEl.getBoundingClientRect()
     const scale = pageRect.width / pageInfo.width
     const toPdf = (x: number, y: number): [number, number] => [(x - pageRect.left) / scale, (y - pageRect.top) / scale]
@@ -93,17 +84,31 @@ export default function SelectionToolbar(): React.ReactElement | null {
       const [x1, y1] = toPdf(r.right, r.bottom)
       return [x0, y0, x1, y0, x0, y1, x1, y1]
     })
+    const bounding = range.getBoundingClientRect()
+    return { pageIndex, quads, x: bounding.left + bounding.width / 2, y: bounding.top, bounding }
+  }, [info])
 
-    if (armedMarkType) {
-      // Pen mode: mark immediately, clear the selection, stay armed.
-      sel.removeAllRanges()
-      void markQuads(pageIndex, quads, armedMarkType)
+  const handleSelectionEnd = useCallback((): void => {
+    const r = readSelection()
+    if (!r) {
+      setPending(null)
       return
     }
+    if (armedMarkType) {
+      // Pen mode: mark immediately, clear the selection, stay armed.
+      window.getSelection()?.removeAllRanges()
+      void markQuads(r.pageIndex, r.quads, armedMarkType)
+      return
+    }
+    setPending({ pageIndex: r.pageIndex, quads: r.quads, x: r.x, y: r.y })
+  }, [readSelection, armedMarkType, markQuads])
 
-    const bounding = range.getBoundingClientRect()
-    setPending({ pageIndex, quads, x: bounding.left + bounding.width / 2, y: bounding.top })
-  }, [info, armedMarkType, markQuads])
+  // Keep the floating toolbar on the selection after the layout moves
+  // (zoom, scroll) instead of dropping the selection.
+  const followSelection = useCallback((): void => {
+    const r = readSelection()
+    setPending(r ? { pageIndex: r.pageIndex, quads: r.quads, x: r.x, y: r.y } : null)
+  }, [readSelection])
 
   useEffect(() => {
     if (!copyAllowed || !annotateAllowed || !editMode) return
@@ -125,12 +130,11 @@ export default function SelectionToolbar(): React.ReactElement | null {
   }, [copyAllowed, annotateAllowed, editMode, handleSelectionEnd])
 
   useEffect(() => {
-    // Selection scrolls out from under a static-positioned toolbar otherwise.
-    const onScroll = (): void => setPending(null)
+    const onScroll = (): void => followSelection()
     const viewer = document.querySelector('.viewer')
     viewer?.addEventListener('scroll', onScroll)
     return () => viewer?.removeEventListener('scroll', onScroll)
-  }, [])
+  }, [followSelection])
 
   // Switching tools mid-flight (e.g. pressing Escape) should drop any
   // leftover floating toolbar from the previous mode.
@@ -138,21 +142,19 @@ export default function SelectionToolbar(): React.ReactElement | null {
     setPending(null)
   }, [tool])
 
-  // Zooming rescales every page's text layer in place. A selection made
-  // (or still in progress) at the old scale no longer lines up with the new
-  // one, and applying it would mark the wrong spot — so zooming clears any
-  // in-flight selection instead of trying to carry stale coordinates over.
+  // Zooming rescales the text layer in place, so the DOM selection survives;
+  // re-read it after layout settles and the toolbar follows it.
   useEffect(() => {
-    setPending(null)
-    window.getSelection()?.removeAllRanges()
-  }, [zoom, fitMode])
+    const t = setTimeout(followSelection, 60)
+    return () => clearTimeout(t)
+  }, [zoom, fitMode, followSelection])
 
   const applyMark = async (type: AnnotType): Promise<void> => {
-    if (!pending) return
-    const { pageIndex, quads } = pending
+    // Re-read at apply time so the quads always match the current zoom.
+    const r = readSelection()
     setPending(null)
     window.getSelection()?.removeAllRanges()
-    await markQuads(pageIndex, quads, type)
+    if (r) await markQuads(r.pageIndex, r.quads, type)
   }
 
   if (!pending || !copyAllowed || !annotateAllowed || !editMode) return null

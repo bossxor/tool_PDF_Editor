@@ -169,6 +169,13 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
     await update(pageIndex, id, dragPatch(orig, dx, dy, handle))
   }
 
+  // Like Acrobat: once a shape is placed, drop back to the select tool with
+  // the new shape selected, so it can be dragged/resized right away.
+  const pick = (a: AnnotData): void => {
+    useToolStore.getState().setTool('select')
+    setSelected(a.id)
+  }
+
   const commitDraw = async (): Promise<void> => {
     if (!drag) return
     const [sx, sy] = drag.start
@@ -193,12 +200,14 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
       const bbox: [number, number, number, number] = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]
       await create(pageIndex, { type, rect: bbox, quads, style })
     } else if (type === 'Line') {
-      await create(pageIndex, {
-        type,
-        rect,
-        line: [drag.start, drag.cur],
-        style
-      })
+      pick(
+        await create(pageIndex, {
+          type,
+          rect,
+          line: [drag.start, drag.cur],
+          style
+        })
+      )
     } else if (type === 'Ink') {
       const xs = drag.ink.map((p) => p[0])
       const ys = drag.ink.map((p) => p[1])
@@ -221,7 +230,7 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
       setEditing({ id: null, type: 'Text', rect: finalRect, content: '', style })
       return
     } else {
-      await create(pageIndex, { type, rect, style })
+      pick(await create(pageIndex, { type, rect, style }))
     }
     setDrag(null)
   }
@@ -247,17 +256,22 @@ export default function AnnotLayer({ pageIndex, width, height, scale }: Props): 
       }
     } else if (content) {
       if (state.type === 'FreeText') {
-        await create(pageIndex, {
-          type: 'FreeText',
-          rect: state.rect,
-          style: state.style,
-          text: { content, font: 'Helv', size: 12, color: [0, 0, 0], align: 0 }
-        })
+        pick(
+          await create(pageIndex, {
+            type: 'FreeText',
+            rect: state.rect,
+            style: state.style,
+            text: { content, font: 'Helv', size: 12, color: [0, 0, 0], align: 0 }
+          })
+        )
       } else {
         await create(pageIndex, { type: 'Text', rect: [state.rect[0], state.rect[1], state.rect[0] + 24, state.rect[1] + 24], style: state.style, contents: content })
       }
     }
-    if (state.id) useToolStore.getState().setTool('select')
+    if (state.id) {
+      useToolStore.getState().setTool('select')
+      setSelected(state.id)
+    }
   }
 
   const onPointerUp = (): void => {
