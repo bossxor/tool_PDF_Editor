@@ -8,7 +8,7 @@ import Workspace from './Workspace'
 import TabBar from './TabBar'
 import { addRecent, getOpenTabs, getRecent, saveOpenTabs } from './recent'
 import ConfirmDialog, { type ConfirmButton } from '../dialogs/ConfirmDialog'
-import { IconFileText, IconOpen } from '../ui/icons'
+import { IconFileText, IconOpen, IconChevronRight, IconHighlighter, IconColumns, IconLock } from '../ui/icons'
 
 interface Ask {
   title: string
@@ -62,7 +62,7 @@ export default function TabsManager(): React.ReactElement {
   }
 
   useEffect(() => {
-    window.api.onCloseRequested(() => {
+    return window.api.onCloseRequested(() => {
       void (async () => {
         const dirty: TabEntry[] = []
         for (const t of tabsRef.current) if (await t.bundle.api.isDirty()) dirty.push(t)
@@ -165,7 +165,7 @@ export default function TabsManager(): React.ReactElement {
   }, [])
 
   useEffect(() => {
-    window.api.onOpenRequested((path) => {
+    return window.api.onOpenRequested((path) => {
       void openNewTab(path)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -196,6 +196,10 @@ export default function TabsManager(): React.ReactElement {
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       const mod = e.ctrlKey || e.metaKey
+      if (mod && e.key.toLowerCase() === 'o' && !activeId) {
+        e.preventDefault()
+        void openFileDialog()
+      }
       if (mod && e.key.toLowerCase() === 'w' && activeId) {
         e.preventDefault()
         void closeTab(activeId)
@@ -211,7 +215,7 @@ export default function TabsManager(): React.ReactElement {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [activeId, closeTab])
+  }, [activeId, closeTab, openFileDialog])
 
   const dialog = ask && (
     <ConfirmDialog
@@ -229,24 +233,27 @@ export default function TabsManager(): React.ReactElement {
   if (tabs.length === 0) {
     return (
       <div className="landing">
-        <div className="landing-icon">
-          <IconFileText size={56} />
-        </div>
-        <p>PDF 파일을 열어주세요</p>
-        <span className="hint">파일을 끌어다 놓거나 아래 버튼을 눌러 시작하세요</span>
-        <button onClick={() => void openFileDialog()}>
-          <IconOpen size={15} /> 파일 열기
-        </button>
-        {getRecent().length > 0 && (
-          <div className="recent">
-            <h4>최근 파일</h4>
-            {getRecent().map((p) => (
-              <button key={p} title={p} onClick={() => void openNewTab(p)}>
-                {baseName(p)}
-              </button>
-            ))}
-          </div>
-        )}
+        <header className="landing-top"><div className="brand"><span className="brand-icon"><IconFileText size={22} /></span> PDF Editor <span className="brand-tag">DESKTOP</span></div><span className="local-badge"><span className="status-dot" /> 로컬 문서 작업 공간</span></header>
+        <main className="landing-main">
+          <section className="landing-hero">
+            <span className="eyebrow">YOUR DOCUMENT WORKSPACE</span>
+            <h1>문서에 집중하는 시간.<br /><em>작업은 더 정교하게.</em></h1>
+            <p className="hero-description">읽기부터 주석, 페이지 정리까지.<br />PDF 작업에 필요한 도구를 한 공간에서 만나보세요.</p>
+            <button className="open-primary" onClick={() => void openFileDialog()}><IconOpen size={19} /> PDF 파일 열기 <kbd>Ctrl O</kbd><IconChevronRight size={17} /></button>
+            <span className="drop-hint">이 화면에 PDF 파일을 끌어다 놓아도 됩니다</span>
+            <div className="feature-list">
+              <div><IconHighlighter size={19} /><strong>생각을 기록</strong><span>형광펜 · 메모 · 그리기</span></div>
+              <div><IconColumns size={19} /><strong>페이지 정리</strong><span>회전 · 병합 · 추출</span></div>
+              <div><IconLock size={19} /><strong>안전한 저장</strong><span>문서 암호 설정</span></div>
+            </div>
+          </section>
+          <section className="recent-panel">
+            <div className="recent-heading"><div><span className="eyebrow">PICK UP WHERE YOU LEFT OFF</span><h2>최근 문서</h2></div><span className="recent-count">{getRecent().length}개</span></div>
+            {getRecent().length > 0 ? <div className="recent-list">{getRecent().map((p, i) => <button className="recent-row" key={p} title={p} onClick={() => void openNewTab(p)}><span className="recent-file-icon"><IconFileText size={23} /></span><span className="recent-file-info"><strong>{baseName(p)}</strong><small>{p}</small></span><span className="recent-index">0{i + 1}</span><IconChevronRight size={16} /></button>)}</div> : <div className="recent-empty"><span className="empty-document"><IconFileText size={38} /></span><h3>첫 문서를 기다리고 있어요</h3><p>열었던 문서가 이곳에 표시됩니다.<br />파일을 열고 작업을 시작해보세요.</p></div>}
+            <div className="recent-footer"><IconFileText size={14} /> 여러 문서를 탭으로 열고 자유롭게 전환하세요</div>
+          </section>
+        </main>
+        <footer className="landing-footer"><span>PDF Editor <span className="footer-divider">/</span> 나만의 문서 작업 공간</span><span>열기 <kbd>Ctrl O</kbd><span className="footer-divider">·</span> 검색 <kbd>Ctrl F</kbd><span className="footer-divider">·</span> 저장 <kbd>Ctrl S</kbd></span></footer>
         {dialog}
       </div>
     )

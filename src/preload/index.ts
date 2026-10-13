@@ -46,17 +46,23 @@ const api: PdfApi = {
   closeTab: (tabId) => ipcRenderer.invoke('tab:close', tabId),
   forTab,
   onOpenRequested: (cb) => {
-    ipcRenderer.on('open-requested', (_e, path: string) => cb(path))
+    const listener = (_e: Electron.IpcRendererEvent, path: string): void => cb(path)
+    ipcRenderer.on('open-requested', listener)
+    return () => { ipcRenderer.removeListener('open-requested', listener) }
   },
   getPathForFile: (file) => webUtils.getPathForFile(file),
   toggleFullscreen: () => ipcRenderer.invoke('window:toggleFullscreen'),
   startupInfo: (saved) => ipcRenderer.invoke('app:startup', saved),
   forceClose: () => ipcRenderer.invoke('window:forceClose'),
   onCloseRequested: (cb) => {
-    ipcRenderer.on('close-requested', () => cb())
+    const listener = (): void => cb()
+    ipcRenderer.on('close-requested', listener)
+    return () => { ipcRenderer.removeListener('close-requested', listener) }
   },
   onFullscreenChange: (cb) => {
-    ipcRenderer.on('fullscreen-changed', (_e, v: boolean) => cb(v))
+    const listener = (_e: Electron.IpcRendererEvent, v: boolean): void => cb(v)
+    ipcRenderer.on('fullscreen-changed', listener)
+    return () => { ipcRenderer.removeListener('fullscreen-changed', listener) }
   }
 }
 

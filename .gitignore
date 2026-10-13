@@ -3,6 +3,7 @@ out/
 dist/
 *.tmp
 .DS_Store
+.verification/
 
 # Packaged app binaries (too large for git, rebuild with `npm run dist`)
 # The installer is the exception — tracked via Git LFS, see .gitattributes.

@@ -60,8 +60,8 @@ export default function Toolbar({
   const { useDocStore, useToolStore, useAnnotStore } = useTab()
   const info = useDocStore((s) => s.info)
   const currentPage = useDocStore((s) => s.currentPage)
-  const setCurrentPage = useDocStore((s) => s.setCurrentPage)
-  const zoom = useDocStore((s) => s.zoom)
+  const requestPage = useDocStore((s) => s.requestPage)
+  const zoom = useDocStore((s) => s.renderedZoom)
   const fitMode = useDocStore((s) => s.fitMode)
   const twoPage = useDocStore((s) => s.twoPage)
   const setTwoPage = useDocStore((s) => s.setTwoPage)
@@ -80,13 +80,11 @@ export default function Toolbar({
 
   const [fullscreen, setFullscreen] = useState(false)
   useEffect(() => {
-    window.api.onFullscreenChange(setFullscreen)
+    return window.api.onFullscreenChange(setFullscreen)
   }, [])
 
   const goTo = (p: number): void => {
-    const el = document.querySelector(`.page[data-page="${p}"]`)
-    el?.scrollIntoView({ block: 'start' })
-    setCurrentPage(p)
+    requestPage(p)
   }
 
   const canAnnotate = info?.permissions.annotate ?? false

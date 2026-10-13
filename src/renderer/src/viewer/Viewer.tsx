@@ -9,12 +9,15 @@ const OVERSCAN = 2
 export default function Viewer(): React.ReactElement {
   const { api, useDocStore } = useTab()
   const info = useDocStore((s) => s.info)
+  const loading = useDocStore((s) => s.loading)
+  const needsPassword = useDocStore((s) => s.needsPassword)
   const [contentVersion, setContentVersion] = useState(0)
   const zoom = useDocStore((s) => s.zoom)
   const fitMode = useDocStore((s) => s.fitMode)
   const twoPage = useDocStore((s) => s.twoPage)
   const setCurrentPage = useDocStore((s) => s.setCurrentPage)
   const setZoom = useDocStore((s) => s.setZoom)
+  const pageRequest = useDocStore((s) => s.pageRequest)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(800)
@@ -32,7 +35,7 @@ export default function Viewer(): React.ReactElement {
     setContainerWidth(el.clientWidth)
     setViewportHeight(el.clientHeight)
     return () => ro.disconnect()
-  }, [])
+  }, [!!info])
 
   useEffect(() => {
     setContentVersion((v) => v + 1)
@@ -77,6 +80,20 @@ export default function Viewer(): React.ReactElement {
     return { total: y, offsets, sizes }
   }, [info, effectiveZoom, twoPage])
 
+  useEffect(() => {
+    useDocStore.setState({ renderedZoom: effectiveZoom })
+  }, [effectiveZoom, useDocStore])
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el || !pageRequest || layout.offsets.length === 0) return
+    const page = Math.max(0, Math.min(pageRequest.page, layout.offsets.length - 1))
+    el.scrollTop = layout.offsets[page] + pageRequest.y * effectiveZoom
+    setScrollTop(el.scrollTop)
+    setCurrentPage(page)
+    useDocStore.setState({ pageRequest: null })
+  }, [pageRequest, layout, effectiveZoom, setCurrentPage, useDocStore])
+
   const onScroll = (): void => {
     const el = containerRef.current
     if (!el) return
@@ -95,7 +112,7 @@ export default function Viewer(): React.ReactElement {
   }
 
   if (!info) {
-    return <div className="viewer-empty">PDF 파일을 열어주세요 (Ctrl+O)</div>
+    return <div className="viewer-empty"><span className="empty-document">PDF</span><strong>{loading ? '문서를 불러오는 중…' : needsPassword ? '암호를 입력하면 문서가 열립니다' : '문서를 열 수 없습니다'}</strong><span>다른 문서를 열려면 Ctrl+O를 누르세요</span></div>
   }
 
   const first = Math.max(

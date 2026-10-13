@@ -94,7 +94,7 @@ export default function Sidebar({ onPagesChanged }: { onPagesChanged: () => Prom
   const info = useDocStore((s) => s.info)
   const outline = useDocStore((s) => s.outline)
   const currentPage = useDocStore((s) => s.currentPage)
-  const setCurrentPage = useDocStore((s) => s.setCurrentPage)
+  const requestPage = useDocStore((s) => s.requestPage)
   const setError = useDocStore((s) => s.setError)
   const [deleteIndex, setDeleteIndex] = useState<number | null>(null)
   const [extractRange, setExtractRange] = useState<string | null>(null)
@@ -104,9 +104,7 @@ export default function Sidebar({ onPagesChanged }: { onPagesChanged: () => Prom
   const dragFrom = useRef<number | null>(null)
 
   const goTo = (p: number): void => {
-    setCurrentPage(p)
-    const el = document.querySelector(`.page[data-page="${p}"]`)
-    el?.scrollIntoView({ block: 'start' })
+    requestPage(p)
   }
 
   const afterEdit = async (): Promise<void> => {

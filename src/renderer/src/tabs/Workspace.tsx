@@ -10,6 +10,7 @@ import SearchBar from '../panels/SearchBar'
 import PropertyPanel from '../panels/PropertyPanel'
 import SaveOptionsDialog from '../dialogs/SaveOptionsDialog'
 import PrintDialog from '../dialogs/PrintDialog'
+import { IconFileText, IconSearch, IconLock } from '../ui/icons'
 
 export default function Workspace({ onOpenNewTab }: { onOpenNewTab: () => void }): React.ReactElement {
   const tab = useTab()
@@ -24,6 +25,7 @@ export default function Workspace({ onOpenNewTab }: { onOpenNewTab: () => void }
   const filePath = useDocStore((s) => s.filePath)
   const reset = useDocStore((s) => s.reset)
   const currentPage = useDocStore((s) => s.currentPage)
+  const editMode = useDocStore((s) => s.editMode)
   const [searchOpen, setSearchOpen] = useState(false)
   const [saveAsOpen, setSaveAsOpen] = useState(false)
   const [printOpen, setPrintOpen] = useState(false)
@@ -143,6 +145,16 @@ export default function Workspace({ onOpenNewTab }: { onOpenNewTab: () => void }
 
   return (
     <div className="app">
+      <header className="document-header">
+        <div className="document-mark"><IconFileText size={23} /></div>
+        <div className="document-heading">
+          <span className="eyebrow">PDF EDITOR / WORKSPACE</span>
+          <h1>{filePath?.split(/[\\/]/).pop() ?? '문서 열기'}</h1>
+        </div>
+        <span className={`document-state ${dirty ? 'unsaved' : ''}`}>{dirty ? '저장하지 않은 변경' : '변경 사항 없음'}</span>
+        {info?.encrypted && <span className="document-lock" title="암호 보호 문서"><IconLock size={16} /></span>}
+        <button className="header-search" disabled={!info} onClick={() => setSearchOpen((v) => !v)} title="문서 검색 (Ctrl+F)"><IconSearch size={16} /> 검색 <kbd>Ctrl F</kbd></button>
+      </header>
       <Toolbar
         onOpen={onOpenNewTab}
         onSave={() => void handleSave()}
@@ -185,11 +197,11 @@ export default function Workspace({ onOpenNewTab }: { onOpenNewTab: () => void }
           pageCount={info.pageCount}
           onClose={() => setPrintOpen(false)}
           onPrint={(opts) => {
-            void api.print(opts).finally(() => setPrintOpen(false))
+            void api.print(opts).catch(() => setError('인쇄에 실패했습니다. 프린터 연결과 설정을 확인하세요.')).finally(() => setPrintOpen(false))
           }}
         />
       )}
-      <div className="statusbar">{filePath ? `${filePath}${dirty ? ' *' : ''}` : '문서가 열려 있지 않습니다'}</div>
+      <div className="statusbar"><span className="status-dot" /><span className="status-path" title={filePath ?? ''}>{filePath ?? '문서가 열려 있지 않습니다'}</span><span className="status-detail">{info ? `${currentPage + 1} / ${info.pageCount} 페이지` : '대기 중'}</span><span className="status-mode">{editMode ? '편집 모드' : '읽기 모드'}</span></div>
     </div>
   )
 }

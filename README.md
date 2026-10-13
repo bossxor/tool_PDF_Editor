@@ -55,4 +55,6 @@ npm run typecheck  # 타입 검사
 npm run dist       # 설치 프로그램 + 포터블 exe 빌드 (dist/)
 ```
 
+배포 빌드가 완료되면 프로젝트 최상위의 `PDF Editor.exe`와 `PDF Editor Setup.exe`도 최신 결과로 자동 갱신됩니다. UI 글꼴(Pretendard)은 프로그램에 포함되어 별도 설치 없이 적용됩니다.
+
 설계 문서와 작업 현황은 [DESIGN.md](DESIGN.md)에 있습니다. 설치 프로그램은 Git LFS로 관리합니다.

@@ -1,6 +1,6 @@
 {
   "name": "pdf-editor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "PDF viewer & editor",
   "license": "AGPL-3.0-or-later",
@@ -11,8 +11,9 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:ui": "npm run build && electron scripts/ui-smoke.cjs",
     "icon": "node scripts/gen-icon.mjs",
-    "dist": "electron-vite build && electron-builder --win"
+    "dist": "electron-vite build && electron-builder --win && node scripts/sync-distribution.cjs"
   },
   "build": {
     "appId": "local.pdfeditor",

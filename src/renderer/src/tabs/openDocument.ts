@@ -11,17 +11,22 @@ export async function openDocumentInBundle(bundle: TabBundle, path: string): Pro
 
   doc.setLoading(true)
   doc.setError(null)
-  const result = await api.openPath(path)
-  useDocStore.getState().setLoading(false)
-  if (!result.ok) {
-    useDocStore.getState().setError(result.error ?? '파일을 열 수 없습니다.')
-    return
-  }
-  useDocStore.getState().setOpened(path, result.needsPassword)
-  annot.reset()
-  useToolStore.getState().setTool('select')
-  if (!result.needsPassword) {
-    await loadInfoInBundle(bundle)
+  try {
+    const result = await api.openPath(path)
+    if (!result.ok) {
+      useDocStore.getState().setError(result.error ?? '파일을 열 수 없습니다.')
+      return
+    }
+    useDocStore.getState().setOpened(path, result.needsPassword)
+    annot.reset()
+    useToolStore.getState().setTool('select')
+    if (!result.needsPassword) {
+      await loadInfoInBundle(bundle)
+    }
+  } catch (error) {
+    useDocStore.getState().setError(`문서를 열 수 없습니다. ${error instanceof Error ? error.message : String(error)}`)
+  } finally {
+    useDocStore.getState().setLoading(false)
   }
 }
 

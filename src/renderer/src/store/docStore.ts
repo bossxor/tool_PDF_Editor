@@ -11,6 +11,9 @@ interface DocState {
   errorMessage: string | null
 
   currentPage: number
+  pageRequest: { page: number; y: number } | null
+  requestPage: (page: number, y?: number) => void
+  renderedZoom: number
   zoom: number // 1 = 100%
   fitMode: 'width' | 'page' | 'custom'
   twoPage: boolean // facing-pages layout
@@ -45,6 +48,9 @@ export function createDocStore(): DocStoreHook {
     errorMessage: null,
 
     currentPage: 0,
+    pageRequest: null,
+    requestPage: (page, y = 0) => set({ pageRequest: { page, y } }),
+    renderedZoom: 1,
     zoom: 1,
     fitMode: 'width',
     editMode: false,
@@ -59,7 +65,7 @@ export function createDocStore(): DocStoreHook {
     setInfo: (info, outline) => set({ info, outline, needsPassword: false, search: null }),
     setPasswordError: (msg) => set({ passwordError: msg }),
     setCurrentPage: (p) => set({ currentPage: p }),
-    setZoom: (z) => set({ zoom: z, fitMode: 'custom' }),
+    setZoom: (z) => set({ zoom: Math.min(8, Math.max(0.1, z)), fitMode: 'custom' }),
     setFitMode: (m) => set({ fitMode: m }),
     setEditMode: (v) => set({ editMode: v }),
     setTwoPage: (v) => set({ twoPage: v }),
