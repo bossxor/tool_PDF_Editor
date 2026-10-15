@@ -8,14 +8,23 @@ Windows용 PDF 뷰어·편집기입니다. 문서 읽기부터 주석 작성, �
 
 ## 다운로드
 
-현재 버전은 **v0.1.2**입니다. [최신 릴리즈](https://github.com/bossxor/tool_PDF_Editor/releases/latest)에서 받을 수 있습니다.
+현재 버전은 **v0.1.3**입니다. [최신 릴리즈](https://github.com/bossxor/tool_PDF_Editor/releases/latest)에서 받을 수 있습니다.
 
-- [ZIP 버전 다운로드](https://github.com/bossxor/tool_PDF_Editor/releases/download/v0.1.2/PDF.Editor.0.1.2.zip) — **폴더 전체를 압축 해제**한 뒤 `PDF Editor.exe` 실행
-- [SHA-256 검증 파일](https://github.com/bossxor/tool_PDF_Editor/releases/download/v0.1.2/SHA256SUMS.txt)
+- [설치 버전 다운로드](https://github.com/bossxor/tool_PDF_Editor/releases/download/v0.1.3/PDF.Editor.Setup.0.1.3.exe) — 설치·바로가기·PDF 연결 프로그램 등록
+- [포터블 버전 다운로드](https://github.com/bossxor/tool_PDF_Editor/releases/download/v0.1.3/PDF.Editor.Portable.0.1.3.exe) — 설치 없이 실행
+- [SHA-256 검증 파일](https://github.com/bossxor/tool_PDF_Editor/releases/download/v0.1.3/SHA256SUMS.txt)
 
-업데이트할 때는 프로그램을 종료하고 새 ZIP을 **별도 빈 폴더**에 압축 해제하세요. 실행 파일 하나만 옮기면 실행되지 않습니다. v0.1.1 설치본과 나란히 사용할 수 있으며 기존 문서·설정을 삭제하지 않습니다. ZIP은 설치 프로그램, 임시 폴더에서 실행되는 자동 압축 해제 도구, 별도 제거 프로그램을 포함하지 않습니다. 제거하려면 앱 종료 후 **압축 해제했던 앱 폴더만** 삭제하면 됩니다. `.pdf` 연결과 바로가기는 자동 등록하지 않습니다.
+기본 PDF 프로그램으로 사용할 때는 **설치 버전**을 사용하세요. 설치 후 Windows의 **설정 → 앱 → 기본 앱**에서 `.pdf`의 기본 프로그램으로 PDF Editor를 선택할 수 있습니다. 설치 프로그램은 연결 프로그램 후보를 등록하며 사용자가 지정한 기존 기본 앱을 강제로 덮어쓰지 않습니다. 업데이트는 열려 있는 PDF Editor 창을 모두 저장·종료한 후 설치 파일을 실행하세요. 포터블은 파일 연결과 바로가기를 자동 등록하지 않으며, 종료 후 실행 파일 교체로 업데이트합니다.
 
-기존 제거 프로그램이 백신에 차단되었다면 예외 추가나 백신 중지로 실행을 강행하지 마세요. 탐지명·차단 파일의 해시를 확보해 백신 공급사에 오탐 여부를 확인해야 합니다. v0.1.2 ZIP 사용을 위해 기존 제거 프로그램을 실행할 필요는 없습니다. 새 배포도 코드 서명 인증서가 없어 서명되지 않았으며, 모든 백신에서 미탐지를 보장하지 않습니다. SHA-256은 다운로드 무결성 검증용이며 코드 서명을 대신하지 않습니다.
+설치·제거 시 앱 실행 여부를 직접 조회하고, 실행 중이면 저장·종료를 요청합니다. 이 확인 경로에서 PowerShell·cmd·taskkill을 실행하거나 앱을 강제 종료하지 않습니다. 실행 중인 포터블도 이름이 같아 먼저 종료해야 합니다. 이전 제거 프로그램의 정확한 탐지 원인은 아직 확인하지 못했으며, 서명 인증서가 없어 새 파일도 서명되지 않았습니다. 차단이 계속되면 백신 예외 등록이나 감시 해제로 실행을 강행하지 말고 탐지명·파일 해시를 확보해 주세요. SHA-256은 무결성 확인용이며 코드 서명을 대신하지 않습니다.
+
+## v0.1.3 변경 사항
+
+- **설치 버전과 포터블 버전을 함께 배포**하도록 복원: 설치 버전의 PDF 연결 등록·바로가기·제거 기능 유지
+- 설치·제거의 앱 실행 확인을 직접 조회 방식으로 변경하고, 셸 실행·강제 종료 대신 사용자에게 저장·종료 요청
+- v0.1.2의 확대·축소 성능 개선 유지
+- 두 실행 파일과 SHA-256을 함께 생성하고 프로젝트 최상위 실행 파일도 갱신
+- v0.1.2의 ZIP 단독 배포는 설치 버전의 대체로 사용하지 않음
 
 ## v0.1.2 변경 사항
 
@@ -86,11 +95,12 @@ npm run build      # 앱 빌드 (out/)
 npm run test:ui    # 빌드 + 숨겨진 Electron 창에서 UI 회귀 검증
 npm run test:engine # 빌드 + 실제 PDF 엔진·작업 스레드 회귀 검증
 npm run test:app    # 실제 main/preload/renderer 통합 검증 (test:engine 실행 후)
-npm run dist       # 일반 ZIP 빌드 + SHA-256 (dist/)
-npm run dist:installer # 기존 NSIS 설치본 호환성 조사용 선택 빌드; 기본 릴리스에 미포함
+npm run test:installer # 기존 설치본·레지스트리를 바꾸지 않는 설치/제거 실행 확인 검증 (dist 실행 후)
+npm run dist       # 설치 EXE + 포터블 EXE + SHA-256 (dist/)
+npm run dist:installer # 설치 EXE만 빌드
 ```
 
-배포 빌드가 완료되면 프로젝트 최상위의 `PDF Editor.zip`도 최신 결과로 자동 갱신됩니다. `dist/`에는 `PDF.Editor.0.1.2.zip`, `SHA256SUMS.txt`, `win-unpacked/`가 생성됩니다. 기존 최상위 EXE는 갱신하지 않으며 릴리스에 올리지 않습니다. 서명용 인증서가 준비된 경우 electron-builder의 공식 코드 서명 설정으로 서명할 수 있습니다.
+배포 빌드가 완료되면 프로젝트 최상위의 `PDF Editor Setup.exe`와 `PDF Editor.exe`도 최신 결과로 자동 갱신됩니다. `dist/`에는 `PDF.Editor.Setup.0.1.3.exe`, `PDF.Editor.Portable.0.1.3.exe`, `SHA256SUMS.txt`, `win-unpacked/`가 생성됩니다. 서명용 인증서가 준비된 경우 electron-builder의 공식 코드 서명 설정으로 서명할 수 있습니다.
 
 UI 회귀 검증은 테스트 문서 데이터를 사용해 시작 화면, 글꼴 로드, Ctrl+O 열기, 페이지 이동, 창 크기 변경 시 화면 맞춤, 확대율 표시, 검색 버튼을 확인합니다. 화면 캡처는 `.verification/`에 저장됩니다.
 

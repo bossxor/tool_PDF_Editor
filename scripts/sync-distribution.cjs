@@ -4,7 +4,8 @@ const { createHash } = require('node:crypto')
 const root = path.resolve(__dirname, '..')
 const { version } = require(path.join(root, 'package.json'))
 const artifacts = [
-  [`PDF.Editor.${version}.zip`, 'PDF Editor.zip']
+  [`PDF.Editor.Setup.${version}.exe`, 'PDF Editor Setup.exe'],
+  [`PDF.Editor.Portable.${version}.exe`, 'PDF Editor.exe']
 ]
 for (const [source] of artifacts) {
   if (!fs.existsSync(path.join(root, 'dist', source))) throw new Error(`Missing distribution: ${source}`)
