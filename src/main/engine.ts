@@ -1,4 +1,4 @@
-// MuPDF wrapper. Runs in the Electron main process (Node context), so it can
+// MuPDF wrapper. Runs in a Node worker thread, so it can
 // read the wasm file straight off disk the same way our verified test did.
 // One EngineSession = one open document. Multiple sessions (one per UI tab)
 // can be alive at once; main/index.ts keeps a Map<tabId, EngineSession>.
@@ -114,6 +114,13 @@ export class EngineSession {
   private password: string | null = null
   private filePath: string | null = null
   private dirty = false
+  private renderCache = new Map<string, { width: number; height: number; png: Buffer }>()
+  private cacheBytes = 0
+
+  private clearRenderCache(): void {
+    this.renderCache.clear()
+    this.cacheBytes = 0
+  }
 
   private requireDoc(): mupdf.PDFDocument {
     if (!this.doc) throw new Error('No document open')
@@ -130,9 +137,12 @@ export class EngineSession {
 
   private markDirty(): void {
     this.dirty = true
+    this.clearRenderCache()
   }
 
   close(): void {
+    this.clearRenderCache()
+    this.doc?.destroy()
     this.doc = null
     this.password = null
     this.filePath = null
@@ -140,6 +150,7 @@ export class EngineSession {
   }
 
   async openPath(p: string): Promise<OpenResult> {
+    this.close()
     try {
       const data = fs.readFileSync(p)
       const opened = mupdf.Document.openDocument(data, 'application/pdf')
@@ -182,6 +193,7 @@ export class EngineSession {
         height: bounds[3] - bounds[1],
         rotation: getRotation(page)
       })
+      page.destroy()
     }
     return {
       pageCount: count,
@@ -222,23 +234,56 @@ export class EngineSession {
   }
 
   renderPage(pageIndex: number, scale: number): { width: number; height: number; png: Buffer } {
+    if (!Number.isFinite(scale) || scale <= 0) throw new Error('Invalid render scale')
     const d = this.requireDoc()
     const page = d.loadPage(pageIndex)
-    this.setOverlayAnnotsHidden(page, true)
-    const matrix = mupdf.Matrix.scale(scale, scale)
-    const pix = page.toPixmap(matrix, mupdf.ColorSpace.DeviceRGB, false, true)
-    const png = Buffer.from(pix.asPNG())
-    return { width: pix.getWidth(), height: pix.getHeight(), png }
+    let pix: mupdf.Pixmap | undefined
+    try {
+      const [x0, y0, x1, y1] = page.getBounds()
+      const w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0)
+      // Bound screen bitmap memory (~32 MB RGB+A worst case) even for posters
+      // and 800% zoom. CSS retains the requested document size and coordinates.
+      const rasterScale = Math.min(scale, Math.sqrt(8_000_000 / (w * h)), 8192 / w, 8192 / h)
+      const key = `${pageIndex}:${rasterScale}`
+      const cached = this.renderCache.get(key)
+      if (cached) {
+        this.renderCache.delete(key)
+        this.renderCache.set(key, cached)
+        return cached
+      }
+      this.setOverlayAnnotsHidden(page, true)
+      pix = page.toPixmap(mupdf.Matrix.scale(rasterScale, rasterScale), mupdf.ColorSpace.DeviceRGB, false, true)
+      const result = { width: pix.getWidth(), height: pix.getHeight(), png: Buffer.from(pix.asPNG()) }
+      const budget = 32 * 1024 * 1024
+      if (result.png.byteLength <= budget) {
+        while ((this.cacheBytes + result.png.byteLength > budget || this.renderCache.size >= 64) && this.renderCache.size > 0) {
+          const oldest = this.renderCache.keys().next().value!
+          this.cacheBytes -= this.renderCache.get(oldest)!.png.byteLength
+          this.renderCache.delete(oldest)
+        }
+        this.renderCache.set(key, result)
+        this.cacheBytes += result.png.byteLength
+      }
+      return result
+    } finally {
+      pix?.destroy()
+      page.destroy()
+    }
   }
 
   loadPageForPrint(pageIndex: number, scale: number, includeAnnots: boolean): { width: number; height: number; png: Buffer } {
     const d = this.requireDoc()
     const page = d.loadPage(pageIndex)
     // Print has no SVG overlay — annotations must be baked into the bitmap.
-    this.setOverlayAnnotsHidden(page, false)
-    const matrix = mupdf.Matrix.scale(scale, scale)
-    const pix = page.toPixmap(matrix, mupdf.ColorSpace.DeviceRGB, false, includeAnnots)
-    return { width: pix.getWidth(), height: pix.getHeight(), png: Buffer.from(pix.asPNG()) }
+    let pix: mupdf.Pixmap | undefined
+    try {
+      this.setOverlayAnnotsHidden(page, false)
+      pix = page.toPixmap(mupdf.Matrix.scale(scale, scale), mupdf.ColorSpace.DeviceRGB, false, includeAnnots)
+      return { width: pix.getWidth(), height: pix.getHeight(), png: Buffer.from(pix.asPNG()) }
+    } finally {
+      pix?.destroy()
+      page.destroy()
+    }
   }
 
   renderThumbnail(pageIndex: number, width: number): { width: number; height: number; png: Buffer } {
@@ -247,6 +292,7 @@ export class EngineSession {
     const bounds = page.getBounds()
     const pageWidth = bounds[2] - bounds[0] || 1
     const scale = width / pageWidth
+    page.destroy()
     return this.renderPage(pageIndex, scale)
   }
 

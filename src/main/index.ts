@@ -1,29 +1,25 @@
 import fs from 'node:fs'
 import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { join } from 'node:path'
-import { EngineSession } from './engine'
+import { createEngineClient, type EngineClient } from './engine-client'
 import { parseRange, printDocument } from './print'
 
 let mainWindow: BrowserWindow | null = null
 let pendingOpenPaths: string[] = []
 const launchedWithFile = process.argv.some((a) => a.toLowerCase().endsWith('.pdf'))
-const sessions = new Map<string, EngineSession>()
+const sessions = new Map<string, EngineClient>()
 
 function isDev(): boolean {
   return !!process.env['ELECTRON_RENDERER_URL']
 }
 
-function getSession(tabId: string): EngineSession {
+function getSession(tabId: string): EngineClient {
   const s = sessions.get(tabId)
   if (!s) throw new Error('Unknown tab: ' + tabId)
   return s
 }
 
 let forceClose = false
-
-function anyDirty(): boolean {
-  return [...sessions.values()].some((s) => s.getIsDirty())
-}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -60,7 +56,7 @@ function createWindow(): void {
   // The confirmation UI lives in the renderer (ConfirmDialog); it calls
   // 'window:forceClose' once the user has decided.
   mainWindow.on('close', (e) => {
-    if (!forceClose && anyDirty()) {
+    if (!forceClose && sessions.size > 0) {
       e.preventDefault()
       mainWindow?.webContents.send('close-requested')
     }
@@ -75,10 +71,10 @@ function createWindow(): void {
 
 function registerIpc(): void {
   ipcMain.handle('tab:create', async (_e, tabId: string) => {
-    sessions.set(tabId, new EngineSession())
+    sessions.set(tabId, createEngineClient())
   })
   ipcMain.handle('tab:close', async (_e, tabId: string) => {
-    sessions.get(tabId)?.close()
+    await sessions.get(tabId)?.close()
     sessions.delete(tabId)
   })
 
@@ -98,11 +94,11 @@ function registerIpc(): void {
   ipcMain.handle('doc:isDirty', async (_e, tabId: string) => getSession(tabId).getIsDirty())
 
   ipcMain.handle('render:page', async (_e, tabId: string, page: number, scale: number) => {
-    const r = getSession(tabId).renderPage(page, scale)
+    const r = await getSession(tabId).renderPage(page, scale)
     return { width: r.width, height: r.height, png: r.png.buffer.slice(r.png.byteOffset, r.png.byteOffset + r.png.byteLength) }
   })
   ipcMain.handle('render:thumbnail', async (_e, tabId: string, page: number, width: number) => {
-    const r = getSession(tabId).renderThumbnail(page, width)
+    const r = await getSession(tabId).renderThumbnail(page, width)
     return { width: r.width, height: r.height, png: r.png.buffer.slice(r.png.byteOffset, r.png.byteOffset + r.png.byteLength) }
   })
 
@@ -149,7 +145,7 @@ function registerIpc(): void {
       path = result.filePaths[0]
     }
     try {
-      const r = getSession(tabId).insertPdf(after, path, password)
+      const r = await getSession(tabId).insertPdf(after, path, password)
       if (r === 'needsPassword') return { ok: false, needsPassword: true, path }
       if (r === 'wrongPassword') return { ok: false, needsPassword: true, path, error: '비밀번호가 틀렸습니다.' }
       return { ok: true, count: r }
@@ -159,16 +155,16 @@ function registerIpc(): void {
   })
   ipcMain.handle('page:extract', async (_e, tabId: string, range: string) => {
     const session = getSession(tabId)
-    const indices = parseRange(range, session.getInfo().pageCount)
+    const indices = parseRange(range, (await session.getInfo()).pageCount)
     if (indices.length === 0) return { ok: false, error: '페이지 범위가 올바르지 않습니다.' }
-    const base = (session.getFilePath() ?? 'document.pdf').replace(/\.pdf$/i, '')
+    const base = ((await session.getFilePath()) ?? 'document.pdf').replace(/\.pdf$/i, '')
     const result = await dialog.showSaveDialog(mainWindow!, {
       filters: [{ name: 'PDF', extensions: ['pdf'] }],
       defaultPath: `${base}_p${range.replace(/[^0-9,-]/g, '')}.pdf`
     })
     if (result.canceled || !result.filePath) return { ok: false }
     try {
-      session.extractPages(indices, result.filePath)
+      await session.extractPages(indices, result.filePath)
       return { ok: true, path: result.filePath }
     } catch (e) {
       return { ok: false, error: String((e as Error)?.message ?? e) }
@@ -177,7 +173,7 @@ function registerIpc(): void {
 
   ipcMain.handle('doc:save', async (_e, tabId: string, opts: any) => {
     const session = getSession(tabId)
-    const path = session.getFilePath()
+    const path = await session.getFilePath()
     if (!path) return { ok: false }
     await session.save(path, opts.encryption)
     return { ok: true, path }
@@ -187,7 +183,7 @@ function registerIpc(): void {
     const session = getSession(tabId)
     const result = await dialog.showSaveDialog(mainWindow!, {
       filters: [{ name: 'PDF', extensions: ['pdf'] }],
-      defaultPath: session.getFilePath() ?? 'document.pdf'
+      defaultPath: (await session.getFilePath()) ?? 'document.pdf'
     })
     if (result.canceled || !result.filePath) return { ok: false }
     await session.save(result.filePath, opts.encryption)

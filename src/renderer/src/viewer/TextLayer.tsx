@@ -31,30 +31,31 @@ export default function TextLayer({ api, pageIndex, scale, visible, copyAllowed 
   // span to the exact PDF line width. Selection rects (and therefore marks)
   // then cover the real text at every zoom level instead of drifting.
   useLayoutEffect(() => {
-    layerRef.current?.querySelectorAll<HTMLSpanElement>('span').forEach((el) => {
-      el.style.transform = ''
-      const natural = el.offsetWidth
+    const spans = Array.from(layerRef.current?.querySelectorAll<HTMLSpanElement>('span') ?? [])
+    spans.forEach(el => { el.style.transform = '' })
+    const widths = spans.map(el => el.offsetWidth)
+    spans.forEach((el, i) => {
       const target = Number(el.dataset.w)
-      if (natural > 0 && target > 0) el.style.transform = `scaleX(${target / natural})`
+      if (widths[i] > 0 && target > 0) el.style.transform = `scaleX(${target / widths[i]})`
     })
-  }, [lines, scale])
+  }, [lines])
 
   if (!copyAllowed || !lines) return null
 
   return (
-    <div ref={layerRef} className="text-layer" style={{ position: 'absolute', inset: 0 }}>
+    <div ref={layerRef} className="text-layer" style={{ position: 'absolute', left: 0, top: 0, width: `${100 / scale}%`, height: `${100 / scale}%`, transform: `scale(${scale})`, transformOrigin: 'left top' }}>
       {lines.map((line, i) => {
         const [x0, y0, x1, y1] = line.bbox
-        const w = (x1 - x0) * scale
-        const h = (y1 - y0) * scale
+        const w = x1 - x0
+        const h = y1 - y0
         return (
           <span
             key={i}
             data-w={w}
             style={{
               position: 'absolute',
-              left: x0 * scale,
-              top: y0 * scale,
+              left: x0,
+              top: y0,
               height: h,
               fontSize: h,
               lineHeight: `${h}px`,

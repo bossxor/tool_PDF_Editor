@@ -1,5 +1,5 @@
 import { BrowserWindow } from 'electron'
-import type { EngineSession } from './engine'
+import type { EngineClient } from './engine-client'
 
 export interface PrintOptions {
   pages: 'all' | 'current' | string // "1-3,5"
@@ -21,8 +21,8 @@ export function parseRange(spec: string, pageCount: number): number[] {
   return [...out].sort((a, b) => a - b)
 }
 
-export async function printDocument(parent: BrowserWindow, engine: EngineSession, opts: PrintOptions): Promise<void> {
-  const info = engine.getInfo()
+export async function printDocument(parent: BrowserWindow, engine: EngineClient, opts: PrintOptions): Promise<void> {
+  const info = await engine.getInfo()
   let indices: number[]
   if (opts.pages === 'all') indices = info.pages.map((_, i) => i)
   else if (opts.pages === 'current') indices = [opts.currentPage]
@@ -32,7 +32,7 @@ export async function printDocument(parent: BrowserWindow, engine: EngineSession
   const DPI_SCALE = 300 / 72
   const imgs: { dataUrl: string; w: number; h: number }[] = []
   for (const idx of indices) {
-    const page = engine.loadPageForPrint(idx, DPI_SCALE, opts.includeAnnots)
+    const page = await engine.loadPageForPrint(idx, DPI_SCALE, opts.includeAnnots)
     imgs.push({ dataUrl: `data:image/png;base64,${page.png.toString('base64')}`, w: page.width, h: page.height })
   }
 

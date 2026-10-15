@@ -5,7 +5,7 @@ dist/
 .DS_Store
 .verification/
 
-# Packaged app binaries (too large for git, rebuild with `npm run dist`)
-# The installer is the exception — tracked via Git LFS, see .gitattributes.
+# Release artifacts belong in GitHub Releases; rebuild with `npm run dist`.
 *.exe
-!/PDF Editor Setup.exe
+*.zip
+work/

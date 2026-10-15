@@ -21,31 +21,39 @@ export default function PageView({ api, pageIndex, width, height, scale, visible
   const search = useDocStore((s) => s.search)
   const setSelected = useToolStore((s) => s.setSelected)
   const [url, setUrl] = useState<string | null>(null)
-  const requestedScale = useRef(0)
+  const urlRef = useRef<string | null>(null)
+  const renderChain = useRef<Promise<void>>(Promise.resolve())
 
   useEffect(() => {
     if (!visible) return
-    if (requestedScale.current === scale && url) return
     let cancelled = false
-    requestedScale.current = scale
-    api.renderPage(pageIndex, scale).then((r) => {
-      if (cancelled) return
-      const blob = new Blob([r.png], { type: 'image/png' })
-      const objUrl = URL.createObjectURL(blob)
-      setUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev)
-        return objUrl
+    // Keep the last bitmap stretched while zooming. Wait for input to settle,
+    // and allow only one in-flight request per mounted page.
+    const timer = setTimeout(() => {
+      renderChain.current = renderChain.current.then(async () => {
+        if (cancelled) return
+        try {
+          const r = await api.renderPage(pageIndex, scale)
+          if (cancelled) return
+          const objUrl = URL.createObjectURL(new Blob([r.png], { type: 'image/png' }))
+          if (urlRef.current) URL.revokeObjectURL(urlRef.current)
+          urlRef.current = objUrl
+          setUrl(objUrl)
+        } catch (error) {
+          if (!cancelled) useDocStore.getState().setError(`페이지 렌더링에 실패했습니다: ${String(error)}`)
+        }
       })
-    })
+    }, 120)
     return () => {
       cancelled = true
+      clearTimeout(timer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageIndex, scale, visible])
+  }, [api, pageIndex, scale, visible, useDocStore])
 
   useEffect(() => {
     return () => {
-      if (url) URL.revokeObjectURL(url)
+      if (urlRef.current) URL.revokeObjectURL(urlRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

@@ -8,14 +8,27 @@ Windows용 PDF 뷰어·편집기입니다. 문서 읽기부터 주석 작성, �
 
 ## 다운로드
 
-현재 버전은 **v0.1.1**입니다. [최신 릴리즈](https://github.com/bossxor/tool_PDF_Editor/releases/latest)에서 받을 수 있습니다.
+현재 버전은 **v0.1.2**입니다. [최신 릴리즈](https://github.com/bossxor/tool_PDF_Editor/releases/latest)에서 받을 수 있습니다.
 
-- [설치 버전 다운로드](https://github.com/bossxor/tool_PDF_Editor/releases/download/v0.1.1/PDF.Editor.Setup.exe) — 바로가기 생성, `.pdf` 연결 프로그램 등록
-- [포터블 버전 다운로드](https://github.com/bossxor/tool_PDF_Editor/releases/download/v0.1.1/PDF.Editor.exe) — 설치 없이 실행
+- [ZIP 버전 다운로드](https://github.com/bossxor/tool_PDF_Editor/releases/download/v0.1.2/PDF.Editor.0.1.2.zip) — **폴더 전체를 압축 해제**한 뒤 `PDF Editor.exe` 실행
+- [SHA-256 검증 파일](https://github.com/bossxor/tool_PDF_Editor/releases/download/v0.1.2/SHA256SUMS.txt)
 
-기존 설치 버전은 프로그램을 종료한 뒤 새 설치 파일로 업데이트하세요. 포터블 버전은 새 실행 파일로 교체한 뒤 실행하면 됩니다.
+업데이트할 때는 프로그램을 종료하고 새 ZIP을 **별도 빈 폴더**에 압축 해제하세요. 실행 파일 하나만 옮기면 실행되지 않습니다. v0.1.1 설치본과 나란히 사용할 수 있으며 기존 문서·설정을 삭제하지 않습니다. ZIP은 설치 프로그램, 임시 폴더에서 실행되는 자동 압축 해제 도구, 별도 제거 프로그램을 포함하지 않습니다. 제거하려면 앱 종료 후 **압축 해제했던 앱 폴더만** 삭제하면 됩니다. `.pdf` 연결과 바로가기는 자동 등록하지 않습니다.
 
-코드 서명이 되어 있지 않아 Windows SmartScreen 경고가 뜰 수 있습니다.
+기존 제거 프로그램이 백신에 차단되었다면 예외 추가나 백신 중지로 실행을 강행하지 마세요. 탐지명·차단 파일의 해시를 확보해 백신 공급사에 오탐 여부를 확인해야 합니다. v0.1.2 ZIP 사용을 위해 기존 제거 프로그램을 실행할 필요는 없습니다. 새 배포도 코드 서명 인증서가 없어 서명되지 않았으며, 모든 백신에서 미탐지를 보장하지 않습니다. SHA-256은 다운로드 무결성 검증용이며 코드 서명을 대신하지 않습니다.
+
+## v0.1.2 변경 사항
+
+- 문서별 작업 스레드에서 PDF 처리·PNG 압축 실행: 렌더링 중에도 메인 스레드 응답 유지
+- 연속 확대·축소 요청을 120ms 대기 후 병합하고, 화면 안 페이지만 렌더링
+- 페이지별 진행 중 요청을 하나로 제한하고 이전 배율의 응답은 화면에 적용하지 않음
+- 화면 비트맵을 약 800만 픽셀·변 길이 8192px로 제한, 최대 32MiB·64개 PNG 캐시 및 편집·실행 취소 시 무효화
+- 고배율에서는 비트맵을 늘려 표시하므로 선명도가 제한될 수 있음. PDF 좌표·저장 내용과 인쇄 해상도는 유지
+- 확대·축소와 창 크기 변경 시 읽던 페이지 위치 유지, 텍스트 선택 영역의 반복 레이아웃 계산 감소
+- 렌더링용 비트맵과 페이지 자원, 화면 이미지 URL 정리
+- 기본 배포를 제거 프로그램이 필요 없는 일반 ZIP으로 전환하고 SHA-256 제공
+
+측정 방법, 검증 범위와 백신 탐지 조사 한계는 [성능·배포 검증 기록](docs/performance-and-distribution.md)을 참고하세요.
 
 ## v0.1.1 변경 사항
 
@@ -71,10 +84,13 @@ npm run dev        # 개발 실행
 npm run typecheck  # 타입 검사
 npm run build      # 앱 빌드 (out/)
 npm run test:ui    # 빌드 + 숨겨진 Electron 창에서 UI 회귀 검증
-npm run dist       # 설치 프로그램 + 포터블 exe 빌드 (dist/)
+npm run test:engine # 빌드 + 실제 PDF 엔진·작업 스레드 회귀 검증
+npm run test:app    # 실제 main/preload/renderer 통합 검증 (test:engine 실행 후)
+npm run dist       # 일반 ZIP 빌드 + SHA-256 (dist/)
+npm run dist:installer # 기존 NSIS 설치본 호환성 조사용 선택 빌드; 기본 릴리스에 미포함
 ```
 
-배포 빌드가 완료되면 프로젝트 최상위의 `PDF Editor.exe`와 `PDF Editor Setup.exe`도 최신 결과로 자동 갱신됩니다. `dist/`에는 버전 번호가 포함된 설치·포터블 파일과 `win-unpacked/`가 생성됩니다.
+배포 빌드가 완료되면 프로젝트 최상위의 `PDF Editor.zip`도 최신 결과로 자동 갱신됩니다. `dist/`에는 `PDF.Editor.0.1.2.zip`, `SHA256SUMS.txt`, `win-unpacked/`가 생성됩니다. 기존 최상위 EXE는 갱신하지 않으며 릴리스에 올리지 않습니다. 서명용 인증서가 준비된 경우 electron-builder의 공식 코드 서명 설정으로 서명할 수 있습니다.
 
 UI 회귀 검증은 테스트 문서 데이터를 사용해 시작 화면, 글꼴 로드, Ctrl+O 열기, 페이지 이동, 창 크기 변경 시 화면 맞춤, 확대율 표시, 검색 버튼을 확인합니다. 화면 캡처는 `.verification/`에 저장됩니다.
 
@@ -82,4 +98,4 @@ UI 회귀 검증은 테스트 문서 데이터를 사용해 시작 화면, 글�
 
 프로젝트 라이선스는 **AGPL-3.0-or-later**입니다. 포함된 Pretendard 글꼴은 **SIL Open Font License 1.1**을 따릅니다. [글꼴 저작권 및 라이선스](src/renderer/public/Pretendard-LICENSE.txt)는 배포 프로그램에도 포함됩니다.
 
-설계 문서와 작업 현황은 [DESIGN.md](DESIGN.md)에 있습니다. 설치 프로그램은 Git LFS로 관리합니다.
+설계 문서와 작업 현황은 [DESIGN.md](DESIGN.md)에 있습니다. 배포 바이너리는 GitHub Releases에서 관리하며 소스 커밋에는 포함하지 않습니다.

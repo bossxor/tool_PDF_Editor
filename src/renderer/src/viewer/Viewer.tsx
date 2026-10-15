@@ -1,5 +1,5 @@
 import React from 'react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTab } from '../tabs/TabContext'
 import PageView from './PageView'
 
@@ -22,6 +22,7 @@ export default function Viewer(): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(800)
   const [scrollTop, setScrollTop] = useState(0)
+  const scrollPosition = useRef(0)
   const [viewportHeight, setViewportHeight] = useState(600)
 
   useEffect(() => {
@@ -80,6 +81,22 @@ export default function Viewer(): React.ReactElement {
     return { total: y, offsets, sizes }
   }, [info, effectiveZoom, twoPage])
 
+  const previousLayout = useRef({ info, layout })
+  useLayoutEffect(() => {
+    const previous = previousLayout.current
+    previousLayout.current = { info, layout }
+    const el = containerRef.current
+    if (!el || previous.info !== info || pageRequest || previous.layout === layout) return
+    const old = previous.layout
+    const page = old.offsets.findIndex((off, i) => off + old.sizes[i].h > scrollPosition.current + 4)
+    if (page < 0 || !layout.sizes[page]) return
+    const fraction = (scrollPosition.current - old.offsets[page]) / old.sizes[page].h
+    el.scrollTop = layout.offsets[page] + fraction * layout.sizes[page].h
+    scrollPosition.current = el.scrollTop
+    setScrollTop(el.scrollTop)
+    setCurrentPage(page)
+  }, [layout, info, pageRequest])
+
   useEffect(() => {
     useDocStore.setState({ renderedZoom: effectiveZoom })
   }, [effectiveZoom, useDocStore])
@@ -89,6 +106,7 @@ export default function Viewer(): React.ReactElement {
     if (!el || !pageRequest || layout.offsets.length === 0) return
     const page = Math.max(0, Math.min(pageRequest.page, layout.offsets.length - 1))
     el.scrollTop = layout.offsets[page] + pageRequest.y * effectiveZoom
+    scrollPosition.current = el.scrollTop
     setScrollTop(el.scrollTop)
     setCurrentPage(page)
     useDocStore.setState({ pageRequest: null })
@@ -97,19 +115,26 @@ export default function Viewer(): React.ReactElement {
   const onScroll = (): void => {
     const el = containerRef.current
     if (!el) return
+    scrollPosition.current = el.scrollTop
     setScrollTop(el.scrollTop)
     // Update current page = first page whose bottom is past the viewport top
     const idx = layout.offsets.findIndex((off, i) => off + layout.sizes[i].h > el.scrollTop + 4)
     if (idx >= 0) setCurrentPage(idx)
   }
 
-  const onWheel = (e: React.WheelEvent): void => {
-    if (e.ctrlKey) {
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    let nextZoom = effectiveZoom
+    const onWheel = (e: WheelEvent): void => {
+      if (!e.ctrlKey || e.deltaY === 0) return
       e.preventDefault()
-      const delta = e.deltaY > 0 ? -0.1 : 0.1
-      setZoom(Math.min(8, Math.max(0.1, effectiveZoom + delta)))
+      nextZoom = Math.min(8, Math.max(0.1, nextZoom + (e.deltaY > 0 ? -0.1 : 0.1)))
+      setZoom(nextZoom)
     }
-  }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [effectiveZoom, setZoom, !!info])
 
   if (!info) {
     return <div className="viewer-empty"><span className="empty-document">PDF</span><strong>{loading ? '문서를 불러오는 중…' : needsPassword ? '암호를 입력하면 문서가 열립니다' : '문서를 열 수 없습니다'}</strong><span>다른 문서를 열려면 Ctrl+O를 누르세요</span></div>
@@ -128,7 +153,7 @@ export default function Viewer(): React.ReactElement {
   }
 
   return (
-    <div className="viewer" ref={containerRef} onScroll={onScroll} onWheel={onWheel}>
+    <div className="viewer" ref={containerRef} onScroll={onScroll} style={{ overflowAnchor: 'none' }}>
       <div className="viewer-content" style={{ height: layout.total }}>
         {info.pages.map((_, i) => {
           if (i < first || i > last) return null
@@ -154,7 +179,7 @@ export default function Viewer(): React.ReactElement {
                 width={w}
                 height={h}
                 scale={effectiveZoom}
-                visible={true}
+                visible={layout.offsets[i] + h > scrollTop && layout.offsets[i] < scrollTop + viewportHeight}
                 copyAllowed={info.permissions.copy}
               />
             </div>
