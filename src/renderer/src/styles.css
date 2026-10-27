@@ -428,3 +428,17 @@ kbd { font-family: inherit; font-size: 10px; border: 1px solid var(--border); bo
 .status-mode { color: var(--accent); white-space: nowrap; }
 @media (max-width: 900px) { .landing-main { gap: 28px; padding: 40px 28px; } .landing-top, .landing-footer { padding-left: 28px; padding-right: 28px; } .feature-list { gap: 10px; } .header-search kbd { display: none; } }
 @media (max-width: 680px) { .landing-main { grid-template-columns: 1fr; } .landing-hero h1 { font-size: 34px; } .landing-footer { flex-wrap: wrap; } .local-badge { display: none; } .document-state { display: none; } }
+
+/* ---------- Unified title bar (window buttons are an OS overlay) ---------- */
+.tab-bar {
+  height: 44px; box-sizing: border-box; align-items: flex-end; overflow-y: hidden;
+  padding: 8px calc(100% - env(titlebar-area-width, 100%) + 8px) 0 12px;
+  background: #0b121a; border-bottom: 1px solid var(--border);
+}
+.tab-item { align-self: flex-end; }
+.tab-new { align-self: center; }
+.landing-top {
+  background: #0b121a; -webkit-app-region: drag; user-select: none;
+  padding-right: calc(100% - env(titlebar-area-width, 100%) + 16px);
+}
+.landing-top > * { -webkit-app-region: no-drag; }

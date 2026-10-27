@@ -27,6 +27,11 @@ function createWindow(): void {
     height: 860,
     show: false,
     autoHideMenuBar: true,
+    // One continuous dark top edge: tabs sit in the title bar and the OS
+    // window buttons are drawn over it in the same colour (see .tab-bar).
+    backgroundColor: '#0b121a',
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#0b121a', symbolColor: '#cfd8e3', height: 44 },
     icon: isDev() ? join(__dirname, '../../build/icon.png') : undefined,
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
